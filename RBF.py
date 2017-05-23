@@ -691,7 +691,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
     """
 
     if basisArgs is None:
-        basisArgs = {'s':10.0, 'scaling':50.0}
+        basisArgs = {'s':1.0, 'scaling':500.0}
 
     if knots is None:
         knots = _generateBBoxPointsGrid(source)
@@ -725,7 +725,14 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
         ssdistNew = (dist*dist).sum()
 
         # check if should terminate
-        terminate = _checkTermination(
+        if distmode=='alt':
+            if not it%2:
+                terminate = _checkTermination(
+                        it, ssdistNew, ssdistCurrent, knots.shape[0], 
+                        xtol, maxIt, maxKnots,
+                        )
+        else:
+            terminate = _checkTermination(
                         it, ssdistNew, ssdistCurrent, knots.shape[0], 
                         xtol, maxIt, maxKnots,
                         )
