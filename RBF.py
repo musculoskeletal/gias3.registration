@@ -8,7 +8,11 @@ from scipy.spatial.distance import pdist,cdist,squareform
 from scipy.linalg import lu_factor, lu_solve, svd, lstsq, solve, inv, qr
 from scipy.spatial import cKDTree, KDTree
 from scipy.optimize import leastsq
-import cPickle
+
+if sys.version_info.major<3:
+    import cPickle as pickle
+else:
+    import pickle
 # import pdb
 
 #=============================================================================#
@@ -186,7 +190,7 @@ def fitData( C, basis, dataX, dataU ):
     #~ pdb.set_trace()
     if len(dataX)>groupSize:
         A = np.zeros((len(dataX), len(C)))
-        for i in xrange( 0, len(dataX), groupSize ):
+        for i in range( 0, len(dataX), groupSize ):
             # print(str(i)+' - '+str(i+groupSize))
             A[i:i+groupSize,:] = basis(cdist(dataX[i:i+groupSize,:], C))
     else:
@@ -207,7 +211,7 @@ def fitDataPoly3D( C, basis, dataX, dataU, poly ):
     #~ pdb.set_trace()
     if len(dataX)>groupSize:
         A = np.zeros((len(dataX), len(C)))
-        for i in xrange( 0, len(dataX), groupSize ):
+        for i in range( 0, len(dataX), groupSize ):
             # print(str(i)+' - '+str(i+groupSize))
             A[i:i+groupSize,:] = basis( cdist( dataX[i:i+groupSize,:], C ) )
     else:
@@ -241,7 +245,7 @@ def fitDataQR( C, basis, dataX, dataU ):
     #~ pdb.set_trace()
     if len(dataX)>groupSize:
         A = np.zeros((len(dataX), len(C)))
-        for i in xrange( 0, len(dataX), groupSize ):
+        for i in range( 0, len(dataX), groupSize ):
             # print str(i)+' - '+str(i+groupSize)
             A[i:i+groupSize,:] = basis( cdist( dataX[i:i+groupSize,:], C ) )
     else:
@@ -366,11 +370,11 @@ class RBFComponentsField( object ):
              }
         
         with open(filename, 'w') as f:
-            cPickle.dump(d, f, protocol=2)
+            pickle.dump(d, f, protocol=2)
     
     def load( self, filename ):
         with open(filename, 'r') as f:
-            d = cPickle.load(f)
+            d = pickle.load(f)
         
         self.CWidthNN = d['CWidthNN']
         self.nComponents = d['nComponents']
@@ -379,7 +383,6 @@ class RBFComponentsField( object ):
         self.U = d['U']
         self.basisType = d['basisType']
         self.basisArgs = d['basisArgs']
-        print self.basisType
         if self.basisArgs!=None:
             if isinstance(self.basisArgs, list) and self.basisType=='gaussian':
                 self.basisArgs = {'s':self.basisArgs[0]}
@@ -420,7 +423,7 @@ class RBFComponentsField( object ):
         
     def setCentreValues( self, U ):
         if U.shape[0]!=self.nComponents:
-            raise ValueError, 'incorrect number of components'
+            raise ValueError('incorrect number of components')
         else:
             self.U = U
         
@@ -467,7 +470,7 @@ class RBFComponentsField( object ):
         if self.polyOrder!=None:
             return self.evalManyPoly3D(x)
             
-        print 'evaluating at '+str(len(x))+' points'
+        print('evaluating at '+str(len(x))+' points')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -476,7 +479,7 @@ class RBFComponentsField( object ):
         groupSize = 10000
         if len(x)>groupSize:
             y = np.zeros( (self.nComponents, len(x)), dtype=float )
-            for i in xrange( 0, len(x), groupSize ):
+            for i in range( 0, len(x), groupSize ):
                 #~ print str(i)+' - '+str(i+groupSize)
                 r = cdist( x[i:i+groupSize,:], self.C, 'euclidean' )
                 B = self.basis( r )
@@ -493,7 +496,7 @@ class RBFComponentsField( object ):
         """
         evaluate the value of the field at points x
         """
-        print 'evaluating at '+str(len(x))+' points poly'
+        print('evaluating at '+str(len(x))+' points poly')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -502,7 +505,7 @@ class RBFComponentsField( object ):
         groupSize = 10000
         if len(x)>groupSize:
             y = np.zeros( (self.nComponents, len(x)), dtype=float )
-            for i in xrange( 0, len(x), groupSize ):
+            for i in range( 0, len(x), groupSize ):
                 #~ print str(i)+' - '+str(i+groupSize)
                 xGroup = x[i:i+groupSize,:]
                 r = cdist( xGroup, self.C, 'euclidean' )
@@ -529,7 +532,7 @@ class RBFComponentsField( object ):
         
         if dataU.shape[1]!=self.nComponents:
             #~ pdb.set_trace()
-            raise ValueError, 'incorrect number of components in data'
+            raise ValueError('incorrect number of components in data')
             
         else:
             # print 'fitting data...'
@@ -546,7 +549,7 @@ class RBFComponentsField( object ):
         """
         if dataU.shape[1]!=self.nComponents:
             #~ pdb.set_trace()
-            raise ValueError, 'incorrect number of components in data'
+            raise ValueError('incorrect number of components in data')
             
         else:
             # print 'fitting data poly...'
@@ -694,7 +697,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
         basisArgs = {'s':1.0, 'scaling':500.0}
 
     if knots is None:
-        knots = _generateBBoxPointsGrid(source)
+        knots = _generateBBoxPointsGrid(source, padding=10.0)
 
     terminate = False
     it = 0
