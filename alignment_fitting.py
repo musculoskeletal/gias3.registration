@@ -52,8 +52,8 @@ def fitAffine( data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, output
     dataFitted = transform3D.transformAffine( data, t )
     rmsOpt = scipy.sqrt(((dataFitted - target)**2.0 ).sum(1).mean())
     if verbose:
-        print('initial RMS:', rms0)
-        print('final RMS:', rmsOpt)
+        print('initial RMS: {}'.format(rms0))
+        print('final RMS: {}'.format(rmsOpt))
 
     if outputErrors:
         return t, dataFitted, (rms0, rmsOpt)
@@ -83,13 +83,13 @@ def fitTranslation( data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, o
     
     rms0 = scipy.sqrt( obj( t0 ).mean() )
     if verbose:
-        print('initial RMS:', rms0)
+        print('initial RMS: {}'.format(rms0))
         
     xOpt = leastsq( obj, t0, xtol=xtol, maxfev=maxfev )[0]
     
     rmsOpt = scipy.sqrt( obj(xOpt).mean() )
     if verbose:
-        print('final RMS:', rmsOpt)
+        print('final RMS: {}'.format(rmsOpt))
     
     dataFitted = data + xOpt
     if outputErrors:
@@ -135,7 +135,7 @@ def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
     t0 = scipy.array(t0)
     rms0 = scipy.sqrt( obj( t0 ).mean() )
     if verbose:
-        print('initial RMS:', rms0)
+        print('initial RMS: {}'.format(rms0))
         
     if data.shape[0]>=t0.shape[0]:
         if maxfev is None:
@@ -146,7 +146,7 @@ def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
     
     rmsOpt = scipy.sqrt( obj(xOpt).mean() )
     if verbose:
-        print('final RMS:', rmsOpt)
+        print('final RMS: {}'.format(rmsOpt))
     
     # dataFitted = transform3D.transformRigid3DAboutCoM( data, xOpt )
     dataFitted = transform3D.transformRigid3DAboutP( data, xOpt, rotcentre )
@@ -180,13 +180,13 @@ def fitRigidFMin( data, target, t0=None, xtol=1e-3, maxfev=0, sample=None, verbo
     t0 = scipy.array(t0)
     rms0 = scipy.sqrt( obj( t0 ).mean() )
     if verbose:
-        print('initial RMS:', rms0)
+        print('initial RMS: {}'.format(rms0))
         
     xOpt = fmin( obj, t0, xtol=xtol, maxiter=maxfev )
     
     rmsOpt = scipy.sqrt( obj(xOpt).mean() )
     if verbose:
-        print('final RMS:', rmsOpt)
+        print('final RMS: {}'.format(rmsOpt))
     
     dataFitted = transform3D.transformRigid3DAboutCoM( data, xOpt )
     if outputErrors:
@@ -226,7 +226,7 @@ def fitRigidScale( data, target, t0=None, xtol=1e-3, maxfev=None, sample=None, v
     t0 = scipy.array(t0)
     rms0 = scipy.sqrt( obj( t0 ).mean() )
     if verbose: 
-        print('initial RMS:', rms0)
+        print('initial RMS: {}'.format(rms0))
     
     if data.shape[0]>=t0.shape[0]:
         if maxfev is None:
@@ -237,7 +237,7 @@ def fitRigidScale( data, target, t0=None, xtol=1e-3, maxfev=None, sample=None, v
     
     rmsOpt = scipy.sqrt( obj(xOpt).mean() )
     if verbose:
-        print('final RMS:', rmsOpt)
+        print('final RMS: {}'.format(rmsOpt))
     
     dataFitted = transform3D.transformRigidScale3DAboutCoM( data, xOpt )
     if outputErrors:
