@@ -70,12 +70,14 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     
     inputs
     ------
-    data: nx3 array of target point coordinates. N Points must correspond to
-        points in the shape model
+    data: nx3 array of target point coordinates.
     ssm: a gias2.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
     fit_mode: {'sptp'|'tpsp'|'corr'} source to target, target to source, or
-        corresponding fitting
+        corresponding fitting. Use sptp if target datacloud covers more of the
+        object than the shape model. Use tpsp if the target data cloud covers
+        less of the object than the shape model. Use corr if the target
+        datacloud is correspondent with the points in the shape model.
     fit_inds: [optional] restrict fitting to certain points in the 
         shape model
     mw: [float, optional] mahalanobis weight
