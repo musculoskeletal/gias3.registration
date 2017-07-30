@@ -1,6 +1,6 @@
 """
 FILE: shapemodel.py
-LAST MODIFIED: 27-7-2017 
+LAST MODIFIED: 31-7-2017 
 DESCRIPTION: Shape model-based non-rigid registration.
 
 ===============================================================================
