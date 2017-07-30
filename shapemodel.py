@@ -68,8 +68,8 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     Rigid and optionally scaling registration should be performed before
     running this.
     
-    inputs
-    ------
+    arguments
+    ---------
     data: nx3 array of target point coordinates.
     ssm: a gias2.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
@@ -78,16 +78,27 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         object than the shape model. Use tpsp if the target data cloud covers
         less of the object than the shape model. Use corr if the target
         datacloud is correspondent with the points in the shape model.
-    fit_inds: [optional] restrict fitting to certain points in the 
+    
+    keyword arguments
+    -----------------
+    fit_inds: [list of ints] restrict fitting to certain points in the 
         shape model
-    mw: [float, optional] mahalanobis weight
-    init_t: [list, optional] initial [tx,ty,tz,rx,ry,rz,[s]]
-    fit_scale: [bool, False] fit for scaling
-    ftol: [float, 1e-6] relative error desired in sum of squared error
-    sample: number of points to sample from the target data
+    mw: [float] weighting on the mahalanobis fitting penalty. Reasonable value
+        is 0.1 to 1.0
+    init_t: [list] initial [tx,ty,tz,rx,ry,rz,[s]]
+    fit_scale: [bool] fit for scaling, default is False
+    ftol: [float] relative error desired in sum of squared error
+    sample: [int] number of points to sample from the target data
+    ldmk_targ: [mx3 array] additional target landmark points to use during
+        fitting
+    ldmk_evaluator: functional that evaluates corresponding landmark
+        coordinates from reconstructed data points. Should take as input a nx3
+        array of reconstructed coordinates from the shape model and output a
+        mx3 array of landmark coordinates.
+    ldmk_weights: [mx1 float array] the fitting weight for each landmark.
     recon2coords: A function for reconstructing point coordinates from shape
         model data. e.g. r2c13 and r2c31 in this module.
-    verbose: extra info during fit
+    verbose: [bool] extra info during fit
     
     Returns
     -------
@@ -170,11 +181,15 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     def _dist_corr(recon_pts, m):
         return np.sqrt(((data - recon_pts)**2.0).sum(1))
 
-    if fit_mode=='sptp':
-        _dist = _dist_sptp
-    elif fit_mode=='tpsp':
-        _dist = _dist_tpsp
-    else:
+    fit_modes_map = {
+        'sptp': _dist_sptp,
+        'tpsp': _dist_tpsp,
+        'corr': _dist_corr,
+    }
+
+    try:
+        _dist = fit_modes_map[fit_mode]
+    except KeyError:
         raise ValueError('invalid fit mode {}'.format(fit_mode))
 
     #-------------------------------------------------------------------------#
