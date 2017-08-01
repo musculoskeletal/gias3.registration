@@ -73,7 +73,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     data: nx3 array of target point coordinates.
     ssm: a gias2.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
-    fit_mode: {'sptp'|'tpsp'|'corr'} source to target, target to source, or
+    fit_mode: {'st'|'ts'|'corr'} source to target, target to source, or
         corresponding fitting. Use sptp if target datacloud covers more of the
         object than the shape model. Use tpsp if the target data cloud covers
         less of the object than the shape model. Use corr if the target
@@ -112,9 +112,8 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
 
     if recon2coords is None:
         # Function to convert ssm data into point coordinates. Default is for
-        # fieldwork models
-        def recon2coords(xr):
-            return xr.reshape((3,-1)).T
+        # nx3 point clouds.
+        recon2coords = r2c13
 
     print('fitting ssm to points')
     if init_t is None:
@@ -182,8 +181,8 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         return np.sqrt(((data - recon_pts)**2.0).sum(1))
 
     fit_modes_map = {
-        'sptp': _dist_sptp,
-        'tpsp': _dist_tpsp,
+        'st': _dist_sptp,
+        'ts': _dist_tpsp,
         'corr': _dist_corr,
     }
 
