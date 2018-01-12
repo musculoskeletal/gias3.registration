@@ -674,6 +674,8 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
 
     """Iterative RBF registration with greedy knots adding per iteration.
 
+    New knots are placed on registered source points.
+
     inputs
     ------
     source: list of source point coordinates.
@@ -733,7 +735,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
                                         target,
                                         basisType,
                                         basisArgs,
-                                        _distmode, # 'ts' doesnt currently work
+                                        _distmode,
                                         )
         ssdistNew = (dist*dist).sum()
 
@@ -767,6 +769,251 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
                 closestKnotDist = knotsTree.query(sourceNew[maxInd])[0]
                 if closestKnotDist>minKnotDist:
                     knots = np.vstack([knots, sourceNew[maxInd]])
+                    nKnotsAdded += 1
+                
+                if nKnotsAdded==maxKnotsPerIt:
+                    break
+
+            if nKnotsAdded==0:
+                terminate = True
+                print('terminating because no new knots can be added')
+
+        sourceCurrent = sourceNew
+        ssdistCurrent = ssdistNew
+        history['rms'].append(rms)
+        history['ssdist'].append(ssdistCurrent)
+        history['nknots'].append(len(knots))
+        it += 1
+
+    return sourceCurrent, rms, rcf, history 
+
+def rbfRegIterative2(source, target, distmode='ts', knots=None,
+    basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
+    minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20):
+
+    """Iterative RBF registration with greedy knots adding per iteration.
+
+    New knots are placed on source points.
+
+    inputs
+    ------
+    source: list of source point coordinates.
+    target: list of target point coordinates.
+    distmode: how source to target distance is calculated.
+        'st': source to target - between each source point and closest target
+              point.
+        'ts': target to source - between each target point and closest source
+              point.
+        'alt': alternate between st and ts each iteration
+    knots: list of knot coordinates.
+    basisType: Radial basis type.
+    basisArgs: dictionary of arguments fro the basis type.
+    xtol: relative change in error for termination.
+    maxIt: max number of iterations.
+    minKnotDist: minimum distance between knots.
+    maxKnotsPerIt: max number of knots to add per iteration.
+
+    returns
+    -------
+    sourceCurrent: final morphed source point coordinates.
+    rms: final RMS distance between morphed source and target points.
+    rcf: final RBF deformation field.
+    history: fitting results from each iteration. Dict containing
+        'rms': rms error at each iteration,
+        'ssdist': sum of squared distance at each iteration,
+        'nknots': number knots at each iteration.
+    """
+
+    if basisArgs is None:
+        basisArgs = {'s':1.0, 'scaling':500.0}
+
+    if knots is None:
+        knots = _generateBBoxPointsGrid(source, padding=10.0)
+
+    terminate = False
+    it = 0
+    sourceCurrent = source
+    ssdistCurrent = 9999999999999
+    history = {
+        'rms': [],
+        'ssdist': [],
+        'nknots': [],
+        }
+    distmodes = ['ts', 'st']
+    while not terminate:
+
+        # perform fit
+        if distmode=='alt':
+            _distmode = distmodes[it%2]
+        else:
+            _distmode = distmode
+            
+        sourceNew, rms, rcf, dist = rbfreg(
+                                        knots,
+                                        sourceCurrent,
+                                        target,
+                                        basisType,
+                                        basisArgs,
+                                        _distmode,
+                                        )
+        ssdistNew = (dist*dist).sum()
+
+        # check if should terminate
+        if distmode=='alt':
+            if not it%2:
+                terminate = _checkTermination(
+                        it, ssdistNew, ssdistCurrent, knots.shape[0], 
+                        xtol, maxIt, maxKnots,
+                        )
+        else:
+            terminate = _checkTermination(
+                        it, ssdistNew, ssdistCurrent, knots.shape[0], 
+                        xtol, maxIt, maxKnots,
+                        )
+
+        # add knot
+        if not terminate:
+            print('\niteration {}'.format(it))
+            # find source locations with highest errors
+            sourceTree = cKDTree(sourceNew)
+            tsDist, tsInds = sourceTree.query(target, k=1)
+            sourceMaxDistInds = tsInds[np.argsort(tsDist)[::-1]]
+
+            # go through source points from highest error and find
+            # first one that is more than min_knot_dist from an
+            # existing knot
+            nKnotsAdded = 0
+            for maxInd in sourceMaxDistInds:
+                knotsTree  = cKDTree(knots)
+                closestKnotDist = knotsTree.query(source[maxInd])[0]
+                if closestKnotDist>minKnotDist:
+                    knots = np.vstack([knots, source[maxInd]])
+                    nKnotsAdded += 1
+                
+                if nKnotsAdded==maxKnotsPerIt:
+                    break
+
+            if nKnotsAdded==0:
+                terminate = True
+                print('terminating because no new knots can be added')
+
+        sourceCurrent = sourceNew
+        ssdistCurrent = ssdistNew
+        history['rms'].append(rms)
+        history['ssdist'].append(ssdistCurrent)
+        history['nknots'].append(len(knots))
+        it += 1
+
+    return sourceCurrent, rms, rcf, history 
+
+def rbfRegIterative3(source, target, distmode='ts', knots=None,
+    basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
+    minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20):
+
+    """Iterative RBF registration with greedy knots adding per iteration.
+
+    Each iteration only contains it 0 knots plus those added in the last
+    iteration.
+
+    inputs
+    ------
+    source: list of source point coordinates.
+    target: list of target point coordinates.
+    distmode: how source to target distance is calculated.
+        'st': source to target - between each source point and closest target
+              point.
+        'ts': target to source - between each target point and closest source
+              point.
+        'alt': alternate between st and ts each iteration
+    knots: list of knot coordinates.
+    basisType: Radial basis type.
+    basisArgs: dictionary of arguments fro the basis type.
+    xtol: relative change in error for termination.
+    maxIt: max number of iterations.
+    minKnotDist: minimum distance between knots.
+    maxKnotsPerIt: max number of knots to add per iteration.
+
+    returns
+    -------
+    sourceCurrent: final morphed source point coordinates.
+    rms: final RMS distance between morphed source and target points.
+    rcf: final RBF deformation field.
+    history: fitting results from each iteration. Dict containing
+        'rms': rms error at each iteration,
+        'ssdist': sum of squared distance at each iteration,
+        'nknots': number knots at each iteration.
+    """
+
+    if basisArgs is None:
+        basisArgs = {'s':1.0, 'scaling':500.0}
+
+    if knots is None:
+        knots0 = _generateBBoxPointsGrid(source, padding=10.0)
+    else:
+        knots0 = np.array(knots)
+
+    # knots for 1st iteration
+    knots = np.array(knots0)
+
+    terminate = False
+    it = 0
+    sourceCurrent = source
+    ssdistCurrent = 9999999999999
+    history = {
+        'rms': [],
+        'ssdist': [],
+        'nknots': [],
+        }
+    distmodes = ['ts', 'st']
+    while not terminate:
+
+        # perform fit
+        if distmode=='alt':
+            _distmode = distmodes[it%2]
+        else:
+            _distmode = distmode
+            
+        sourceNew, rms, rcf, dist = rbfreg(
+                                        knots,
+                                        sourceCurrent,
+                                        target,
+                                        basisType,
+                                        basisArgs,
+                                        _distmode,
+                                        )
+        ssdistNew = (dist*dist).sum()
+
+        # check if should terminate
+        if distmode=='alt':
+            if not it%2:
+                terminate = _checkTermination(
+                        it, ssdistNew, ssdistCurrent, knots.shape[0], 
+                        xtol, maxIt, maxKnots,
+                        )
+        else:
+            terminate = _checkTermination(
+                        it, ssdistNew, ssdistCurrent, knots.shape[0], 
+                        xtol, maxIt, maxKnots,
+                        )
+
+        # add knot
+        if not terminate:
+            print('\niteration {}'.format(it))
+            # find source locations with highest errors
+            sourceTree = cKDTree(sourceNew)
+            tsDist, tsInds = sourceTree.query(target, k=1)
+            sourceMaxDistInds = tsInds[np.argsort(tsDist)[::-1]]
+
+            # go through source points from highest error and find
+            # first one that is more than min_knot_dist from an
+            # existing knot
+            nKnotsAdded = 0
+            knots = np.array(knots0)
+            for maxInd in sourceMaxDistInds:
+                knotsTree  = cKDTree(knots)
+                closestKnotDist = knotsTree.query(source[maxInd])[0]
+                if closestKnotDist>minKnotDist:
+                    knots = np.vstack([knots, source[maxInd]])
                     nKnotsAdded += 1
                 
                 if nKnotsAdded==maxKnotsPerIt:
