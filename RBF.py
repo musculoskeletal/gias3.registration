@@ -25,6 +25,8 @@ else:
     import pickle
 # import pdb
 
+from gias2.registration import alignment_fitting as af
+
 #=============================================================================#
 # Basis functions
 #=============================================================================#
@@ -1031,3 +1033,100 @@ def rbfRegIterative3(source, target, distmode='ts', knots=None,
         it += 1
 
     return sourceCurrent, rms, rcf, history 
+
+def rbfRegNPass(source, target, init_rot=(0,0,0), rbfargs=None, verbose=False):
+    """
+    Multi-pass RBF fitting from source to target point clouds.
+
+    rbfargs should be a list of dicts containing the rbf fitting args
+    for each fitting pass. Default is 2 pass with these args:
+
+    DEFAULT_PARAMS = [
+    {
+        'basisType': 'gaussianNonUniformWidth',
+        'basisArgs': {'s':1.0, 'scaling':1000.0},
+        'distmode': 'alt',
+        'xtol': 1e-1,
+        'maxIt': 20,
+        'maxKnots': 500,
+        'minKnotDist': 20.0,
+        'maxKnotsPerIt': 20,
+    },
+    {
+        'basisType': 'gaussianNonUniformWidth',
+        'basisArgs': {'s':1.0, 'scaling':10.0},
+        'distmode': 'alt',
+        'xtol': 1e-3,
+        'maxIt': 20,
+        'maxKnots': 1000,
+        'minKnotDist': 2.5,
+        'maxKnotsPerIt': 20,
+    }
+    ]
+    """
+
+    if rbfargs is None:
+        rbfargs = [
+            {
+                'basisType': 'gaussianNonUniformWidth',
+                'basisArgs': {'s':1.0, 'scaling':1000.0},
+                'distmode': 'alt',
+                'xtol': 1e-1,
+                'maxIt': 20,
+                'maxKnots': 500,
+                'minKnotDist': 20.0,
+                'maxKnotsPerIt': 20,
+            },
+            {
+                'basisType': 'gaussianNonUniformWidth',
+                'basisArgs': {'s':1.0, 'scaling':10.0},
+                'distmode': 'alt',
+                'xtol': 1e-3,
+                'maxIt': 20,
+                'maxKnots': 1000,
+                'minKnotDist': 2.5,
+                'maxKnotsPerIt': 20,
+            }
+        ]
+    
+    init_rot = np.deg2rad(init_rot)
+    n_iterations = len(rbfargs)
+
+    #=============================================================#
+    # rigidly register source points to target points
+    init_trans = target.mean(0) - source.mean(0)
+    t0 = np.hstack([init_trans, init_rot])
+    reg1_T, source_reg1, reg1_errors = af.fitDataRigidDPEP(
+                                                source,
+                                                target,
+                                                xtol=1e-6,
+                                                sample=1000,
+                                                t0=t0,
+                                                outputErrors=1
+                                                )
+
+    # add isotropic scaling to rigid registration
+    reg2_T, source_reg2, reg2_errors = af.fitDataRigidScaleDPEP(
+                                                source,
+                                                target,
+                                                xtol=1e-6,
+                                                sample=1000,
+                                                t0=np.hstack([reg1_T, 1.0]),
+                                                outputErrors=1
+                                                )
+
+    #=============================================================#
+    
+    _source = source_reg2
+    for it, rbfargs_i in enumerate(rbfargs):
+        if verbose:
+            print('RBF registration pass {}'.format(it+1))
+
+        _source, rms_i, rcf_i, regHist = rbfRegIterative(
+            _source, target, **rbfargs_i
+            )
+
+    if verbose:
+        print('RBF registration final rms: {}'.format(rms_i))
+
+    return _source, (rms_i, rcf_i)
