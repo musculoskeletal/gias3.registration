@@ -74,8 +74,8 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     ssm: a gias2.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
     fit_mode: {'st'|'ts'|'corr'} source to target, target to source, or
-        corresponding fitting. Use sptp if target datacloud covers more of the
-        object than the shape model. Use tpsp if the target data cloud covers
+        corresponding fitting. Use st if target datacloud covers more of the
+        object than the shape model. Use ts if the target data cloud covers
         less of the object than the shape model. Use corr if the target
         datacloud is correspondent with the points in the shape model.
     
