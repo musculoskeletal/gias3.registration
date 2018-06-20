@@ -171,11 +171,11 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     #-------------------------------------------------------------------------#
     targ_tree = cKDTree(data)
     def _dist_sptp(recon_pts, m):
-        return targ_tree.query(recon_pts)[0] + mw*m
+        return targ_tree.query(recon_pts, eps=1e-3, n_jobs=4)[0] + mw*m
 
     def _dist_tpsp(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        return recon_tree.query(data)[0] + mw*m
+        return recon_tree.query(data, eps=1e-3, n_jobs=4)[0] + mw*m
 
     def _dist_corr(recon_pts, m):
         return np.sqrt(((data - recon_pts)**2.0).sum(1))
