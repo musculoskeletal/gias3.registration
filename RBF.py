@@ -194,9 +194,9 @@ def xDist( x, X ):
 def xDist1D( x, X ):
     return X - x
 
-def fitData( C, basis, dataX, dataU ):
-    
-    print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+def fitData( C, basis, dataX, dataU, verbose=True):
+    if verbose:
+        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     #~ pdb.set_trace()
@@ -215,9 +215,9 @@ def fitData( C, basis, dataX, dataU ):
     
     return W, (residual, rank, singVal)
 
-def fitDataPoly3D( C, basis, dataX, dataU, poly ):
-    
-    print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+def fitDataPoly3D( C, basis, dataX, dataU, poly, verbose=True):
+    if verbose:
+        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     #~ pdb.set_trace()
@@ -249,9 +249,9 @@ def fitDataPoly3D( C, basis, dataX, dataU, poly ):
     
     return rbfW, polyCoeff, (residual, rank, singVal)
 
-def fitDataQR( C, basis, dataX, dataU ):
-    
-    print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+def fitDataQR( C, basis, dataX, dataU, verbose=True):
+    if verbose:
+        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     #~ pdb.set_trace()
@@ -367,6 +367,7 @@ class RBFComponentsField( object ):
         self.polyOrder = None
         self.polyCoeffs = None
         self.poly = None
+        self.verbose = True
     
     def save( self, filename ):
         
@@ -481,8 +482,9 @@ class RBFComponentsField( object ):
         #~ return y
         if self.polyOrder!=None:
             return self.evalManyPoly3D(x)
-            
-        print('evaluating at '+str(len(x))+' points')
+        
+        if self.verbose:
+            print('evaluating at '+str(len(x))+' points')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -508,7 +510,8 @@ class RBFComponentsField( object ):
         """
         evaluate the value of the field at points x
         """
-        print('evaluating at '+str(len(x))+' points poly')
+        if self.verbose:
+            print('evaluating at '+str(len(x))+' points poly')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -548,7 +551,9 @@ class RBFComponentsField( object ):
             
         else:
             # print 'fitting data...'
-            self.W, extraInfo = fitData( self.C, self.basis, dataX, dataU )
+            self.W, extraInfo = fitData(
+                self.C, self.basis, dataX, dataU, verbose=self.verbose
+                )
             if fullOutput:
                 return self.W, extraInfo
             else:
@@ -565,7 +570,9 @@ class RBFComponentsField( object ):
             
         else:
             # print 'fitting data poly...'
-            self.W, self.polyCoeffs, extraInfo = fitDataPoly3D( self.C, self.basis, dataX, dataU, self.poly )
+            self.W, self.polyCoeffs, extraInfo = fitDataPoly3D(
+                self.C, self.basis, dataX, dataU, self.poly, verbose=self.verbose
+                )
             #~ self.W, extraInfo = fitDataQR( self.C, self.basis, dataX, dataU )
             if fullOutput:
                 return self.W, self.polyCoeffs, extraInfo
@@ -605,7 +612,7 @@ def _generateBBoxPointsGrid(points, spacing=None, padding=None):
         
     return PAll
 
-def rbfreg(knots, source, target, basistype, basisargs, disttype):
+def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
     """
     Perform a single iteration of RBF registration from source to target
     data points.
@@ -614,6 +621,7 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype):
     """
     # create a RBF Coordinates field
     rcf = RBFComponentsField(3)
+    rcf.verbose = verbose
 
     # set radial basis function
     rcf.makeBasis(basistype, basisargs)
@@ -648,31 +656,36 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype):
     # calculated RMS distance
     d = np.sqrt(((X - Y)**2.0).sum(1))
     dRms = np.sqrt((d*d).mean())
-    print('RMS distance: {}'.format(dRms))
+    if verbose:
+        print('RMS distance: {}'.format(dRms))
 
     return sourceReg, dRms, rcf, d
 
 
-def _checkTermination(it, cost1, cost0, nknots, xtol, max_it, max_knots):
+def _checkTermination(it, cost1, cost0, nknots, xtol, max_it, max_knots, verbose=True):
 
     if it>max_it:
-        print('terminating because max iterations reached')
+        if verbose:
+            print('terminating because max iterations reached')
         return True
 
     if nknots>max_knots:
-        print('terminating because max knots reached')
+        if verbose:
+            print('terminating because max knots reached')
         return True
 
     if (abs(cost1-cost0)/cost0)<xtol:
         print(abs(cost1-cost0)/cost0)
-        print('terminating because xtol reached')
+        if verbose:
+            print('terminating because xtol reached')
         return True
 
     return False
 
 def rbfRegIterative(source, target, distmode='ts', knots=None,
     basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
-    minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20):
+    minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20, verbose=True
+    ):
 
     """Iterative RBF registration with greedy knots adding per iteration.
 
@@ -738,6 +751,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
                                         basisType,
                                         basisArgs,
                                         _distmode,
+                                        verbose=verbose
                                         )
         ssdistNew = (dist*dist).sum()
 
@@ -746,17 +760,18 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
             if not it%2:
                 terminate = _checkTermination(
                         it, ssdistNew, ssdistCurrent, knots.shape[0], 
-                        xtol, maxIt, maxKnots,
+                        xtol, maxIt, maxKnots, verbose=verbose
                         )
         else:
             terminate = _checkTermination(
                         it, ssdistNew, ssdistCurrent, knots.shape[0], 
-                        xtol, maxIt, maxKnots,
+                        xtol, maxIt, maxKnots, verbose=verbose
                         )
 
         # add knot
         if not terminate:
-            print('\niteration {}'.format(it))
+            if verbose:
+                print('\niteration {}'.format(it))
             # find source locations with highest errors
             sourceTree = cKDTree(sourceNew)
             tsDist, tsInds = sourceTree.query(target, k=1)
@@ -778,7 +793,8 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
 
             if nKnotsAdded==0:
                 terminate = True
-                print('terminating because no new knots can be added')
+                if verbose:
+                    print('terminating because no new knots can be added')
 
         sourceCurrent = sourceNew
         ssdistCurrent = ssdistNew
@@ -1102,7 +1118,7 @@ def rbfRegNPass(source, target, init_rot=(0,0,0), rbfargs=None, verbose=False):
                                                 xtol=1e-6,
                                                 sample=1000,
                                                 t0=t0,
-                                                outputErrors=1
+                                                outputErrors=1,
                                                 )
 
     # add isotropic scaling to rigid registration
@@ -1112,7 +1128,7 @@ def rbfRegNPass(source, target, init_rot=(0,0,0), rbfargs=None, verbose=False):
                                                 xtol=1e-6,
                                                 sample=1000,
                                                 t0=np.hstack([reg1_T, 1.0]),
-                                                outputErrors=1
+                                                outputErrors=1,
                                                 )
 
     #=============================================================#
@@ -1123,7 +1139,7 @@ def rbfRegNPass(source, target, init_rot=(0,0,0), rbfargs=None, verbose=False):
             print('RBF registration pass {}'.format(it+1))
 
         _source, rms_i, rcf_i, regHist = rbfRegIterative(
-            _source, target, **rbfargs_i
+            _source, target, verbose=verbose, **rbfargs_i
             )
 
     if verbose:
