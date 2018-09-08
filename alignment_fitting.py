@@ -14,7 +14,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import scipy
 from scipy.spatial import cKDTree
-from scipy.optimize import leastsq, fmin
+from scipy.optimize import leastsq, fmin, least_squares
 from scipy.linalg import lstsq
 from gias2.common import transform3D
 
@@ -346,6 +346,7 @@ def fitDataRigidDPEP( data, target, xtol=1e-5, maxfev=0, t0=None, sample=None, o
     
     initialRMSE = scipy.sqrt(obj(t0).mean())
     tOpt = leastsq( obj, t0, xtol=xtol, maxfev=maxfev )[0]
+    # tOpt = least_squares(obj, t0, method='trf', loss='arctan', f_scale=5.0, xtol=xtol)['x']
     dataFitted = transform3D.transformRigid3DAboutCoM( data, tOpt )
     finalRMSE = scipy.sqrt(obj( tOpt ).mean())
 

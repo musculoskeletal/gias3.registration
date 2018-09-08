@@ -15,7 +15,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import sys
 import numpy as np
 from scipy.spatial import cKDTree
-from scipy.optimize import leastsq
+from scipy.optimize import leastsq, least_squares
 from gias2.common import transform3D
 
 #=============================================================================#
@@ -58,7 +58,7 @@ def r2c31(x_recon):
 def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     init_t=None, fit_scale=False, ftol=1e-6, sample=None,
     ldmk_targs=None, ldmk_evaluator=None, ldmk_weights=None,
-    recon2coords=None, verbose=False
+    recon2coords=None, verbose=False, n_jobs=1, f_scale=5.0
     ):
     
     """
@@ -99,6 +99,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     recon2coords: A function for reconstructing point coordinates from shape
         model data. e.g. r2c13 and r2c31 in this module.
     verbose: [bool] extra info during fit
+    f_scale: f_scale parameter for least_squares trf solver
     
     Returns
     -------
@@ -171,11 +172,11 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     #-------------------------------------------------------------------------#
     targ_tree = cKDTree(data)
     def _dist_sptp(recon_pts, m):
-        return targ_tree.query(recon_pts, eps=1e-3, n_jobs=4)[0] + mw*m
+        return targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0] + mw*m
 
     def _dist_tpsp(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        return recon_tree.query(data, eps=1e-3, n_jobs=4)[0] + mw*m
+        return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw*m
 
     def _dist_corr(recon_pts, m):
         return np.sqrt(((data - recon_pts)**2.0).sum(1))
@@ -197,6 +198,10 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     def _obj_no_ldmks(X):
         # reconstruct data points
         recon_data, mdist = _recon(X)
+
+        # select the fitting points
+        if fit_inds is not None:
+            recon_data = recon_data[fit_inds, :]
 
         # calc error
         err = _dist(recon_data, mdist)
@@ -243,8 +248,10 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0)**2.0).mean())
         print('\ninitial rms distance: {}'.format(dist_init_rms))
 
-    x_opt = leastsq(_obj, x0, ftol=ftol)[0]
-    print('')
+    # x_opt = leastsq(_obj, x0, ftol=ftol)[0]
+    x_opt = least_squares(
+        _obj, x0, method='trf', loss='soft_l1', f_scale=f_scale, ftol=ftol, verbose=0
+        )['x']
         
     recon_data_opt, mdist_opt = _recon(x_opt)
     err_opt = _obj(x_opt)
