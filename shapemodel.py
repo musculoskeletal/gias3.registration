@@ -73,11 +73,12 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     data: nx3 array of target point coordinates.
     ssm: a gias2.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
-    fit_mode: {'st'|'ts'|'corr'} source to target, target to source, or
-        corresponding fitting. Use st if target datacloud covers more of the
-        object than the shape model. Use ts if the target data cloud covers
-        less of the object than the shape model. Use corr if the target
-        datacloud is correspondent with the points in the shape model.
+    fit_mode: {'st'|'ts'|'2way'|'corr'} source to target, target to source, 
+        2 way, or corresponding fitting. Use st if target datacloud covers more
+        of the object than the shape model. Use ts if the target data cloud
+        covers less of the object than the shape model. Use 2 way if neither st
+        ts produces good results. Use corr if the target datacloud is
+        correspondent with the points in the shape model.
     
     keyword arguments
     -----------------
@@ -180,12 +181,20 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         recon_tree = cKDTree(recon_pts)
         return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw*m
 
+    def _dist_2way(recon_pts, m):
+        recon_tree = cKDTree(recon_pts)
+        d_sptp = targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0]
+        d_tpsp = recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0]
+        dm = mw*m
+        return np.hstack([d_sptp, d_tpsp]) + dm
+
     def _dist_corr(recon_pts, m):
         return np.sqrt(((data - recon_pts)**2.0).sum(1))
 
     fit_modes_map = {
         'st': _dist_sptp,
         'ts': _dist_tpsp,
+        '2way': _dist_2way,
         'corr': _dist_corr,
     }
 
