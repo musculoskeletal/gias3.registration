@@ -599,9 +599,9 @@ def _generateBBoxPointsGrid(points, spacing=None, padding=None):
     if spacing is None:
         spacing = (bboxMax - bboxMin)/3.0
 
-    N = (bboxMax - bboxMin) / spacing
+    N = ((bboxMax - bboxMin) / spacing).astype(int) + 1
     for ni, n in enumerate(N):
-        if n<2:
+        if n < 2:
             N[ni] = 2
     
     # generate grid of points in bounding box
