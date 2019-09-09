@@ -1054,31 +1054,52 @@ def rbfRegNPass(source, target, init_rot=(0,0,0), rbfargs=None, verbose=False):
     """
     Multi-pass RBF fitting from source to target point clouds.
 
-    rbfargs should be a list of dicts containing the rbf fitting args
-    for each fitting pass. Default is 2 pass with these args:
+    Each pass is run with the parameters contained in one item in rbfargs.
 
-    DEFAULT_PARAMS = [
-    {
-        'basisType': 'gaussianNonUniformWidth',
-        'basisArgs': {'s':1.0, 'scaling':1000.0},
-        'distmode': 'alt',
-        'xtol': 1e-1,
-        'maxIt': 20,
-        'maxKnots': 500,
-        'minKnotDist': 20.0,
-        'maxKnotsPerIt': 20,
-    },
-    {
-        'basisType': 'gaussianNonUniformWidth',
-        'basisArgs': {'s':1.0, 'scaling':10.0},
-        'distmode': 'alt',
-        'xtol': 1e-3,
-        'maxIt': 20,
-        'maxKnots': 1000,
-        'minKnotDist': 2.5,
-        'maxKnotsPerIt': 20,
-    }
-    ]
+    Inputs
+    ------
+    source : np.ndarray
+        nx3 array of source point coordinates
+    target : np.ndarray
+        mx3 array of target point coordinates
+    init_rot : tuple
+        3 rotation angles (radians) for initial rotation to apply
+        to source before fitting
+    rbfargs : list of dicts
+        should be a list of dicts containing the rbf fitting args
+        for each fitting pass. Default is 2 pass with these args:
+
+        DEFAULT_PARAMS = [
+            {
+                'basisType': 'gaussianNonUniformWidth',
+                'basisArgs': {'s':1.0, 'scaling':1000.0},
+                'distmode': 'alt',
+                'xtol': 1e-1,
+                'maxIt': 20,
+                'maxKnots': 500,
+                'minKnotDist': 20.0,
+                'maxKnotsPerIt': 20,
+            },
+            {
+                'basisType': 'gaussianNonUniformWidth',
+                'basisArgs': {'s':1.0, 'scaling':10.0},
+                'distmode': 'alt',
+                'xtol': 1e-3,
+                'maxIt': 20,
+                'maxKnots': 1000,
+                'minKnotDist': 2.5,
+                'maxKnotsPerIt': 20,
+            }
+        ]
+    verbose : bool
+        print extra outputs
+
+    Returns
+    -------
+    _source : np.ndarray
+        nx3 array of the fitted source point coordinates
+    (rms_i, rcf_i) : Tuple[float, RbfCoordinateField]
+        The rms error and coordinate field for each fitting pass
     """
 
     if rbfargs is None:
