@@ -12,14 +12,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 
-import scipy
+import numpy as np
 
 from gias2.common import math
 from gias2.common import transform3D
 
 
 def norm(v):
-    m = scipy.sqrt((v.astype(float) ** 2.0).sum())
+    m = np.sqrt((v.astype(float) ** 2.0).sum())
     return v / m
 
 
@@ -28,15 +28,15 @@ def calcAffine(old, new):
     where pAxes = [X, Y, Z] where X, Y and Z are column vectors
     """
 
-    dataLandmarks = scipy.array([old[0], \
-                                 scipy.add(old[0], old[1][:, 0]), \
-                                 scipy.add(old[0], old[1][:, 1]), \
-                                 scipy.add(old[0], old[1][:, 2])])
+    dataLandmarks = np.array([old[0],
+                              np.add(old[0], old[1][:, 0]),
+                              np.add(old[0], old[1][:, 1]),
+                              np.add(old[0], old[1][:, 2])])
 
-    targetLandmarks = scipy.array([new[0], \
-                                   scipy.add(new[0], new[1][:, 0]), \
-                                   scipy.add(new[0], new[1][:, 1]), \
-                                   scipy.add(new[0], new[1][:, 2])])
+    targetLandmarks = np.array([new[0],
+                                np.add(new[0], new[1][:, 0]),
+                                np.add(new[0], new[1][:, 1]),
+                                np.add(new[0], new[1][:, 2])])
 
     affineMatrix = transform3D.directAffine(dataLandmarks, targetLandmarks)
 
@@ -51,23 +51,23 @@ def scaleAlignScan(scan, s):
     before alignment.
     """
 
-    scaleMatrix = scipy.array([[1 / s[0], 0.0, 0.0], \
-                               [0.0, 1 / s[1], 0.0], \
-                               [0.0, 0.0, 1 / s[2]]])
+    scale_matrix = np.array([[1 / s[0], 0.0, 0.0],
+                            [0.0, 1 / s[1], 0.0],
+                            [0.0, 0.0, 1 / s[2]]])
 
-    scan.affine(scaleMatrix, order=3)
-    oldCoM = list(scan.CoM)
-    oldpAxes = array(scan.pAxes)
+    scan.affine(scale_matrix, order=3)
+    old_com = list(scan.CoM)
+    old_p_axes = np.array(scan.pAxes)
     # ~ scan.crop( 10 )
 
-    targetLandmarks = [oldCoM, scipy.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])]
-    dataLandmarks = [oldCoM, oldpAxes]
-    alignMatrix = calcAffine(targetLandmarks, dataLandmarks)  # affine is the otherway round
+    target_landmarks = [old_com, np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])]
+    data_landmarks = [old_com, old_p_axes]
+    align_matrix = calcAffine(target_landmarks, data_landmarks)  # affine is the otherway round
 
-    scan.affine(alignMatrix[:3, :3], offset=alignMatrix[:3, -1], order=3)
+    scan.affine(align_matrix[:3, :3], offset=align_matrix[:3, -1], order=3)
     scan.crop(10)
 
-    return scan, [oldCoM, oldpAxes]
+    return scan, [old_com, old_p_axes]
 
 
 def alignAffinePoints(X, u, ut):
@@ -85,16 +85,16 @@ def calcAffineRigid3Points(p1, p2):
     """
     cs1 = calcOrthogCS(p1[0], p1[1], p1[2])
     cs2 = calcOrthogCS(p2[0], p2[1], p2[2])
-    U = scipy.array([cs1[0],
-                     cs1[0] + cs1[1],
-                     cs1[0] + cs1[2],
-                     cs1[0] + cs1[3],
-                     ])
-    UT = scipy.array([cs2[0],
-                      cs2[0] + cs2[1],
-                      cs2[0] + cs2[2],
-                      cs2[0] + cs2[3],
-                      ])
+    U = np.array([cs1[0],
+                  cs1[0] + cs1[1],
+                  cs1[0] + cs1[2],
+                  cs1[0] + cs1[3],
+                  ])
+    UT = np.array([cs2[0],
+                   cs2[0] + cs2[1],
+                   cs2[0] + cs2[2],
+                   cs2[0] + cs2[3],
+                   ])
     return transform3D.directAffine(U, UT)
 
 
@@ -108,13 +108,12 @@ def alignRigid3Points(X, u, ut):
 
 
 def norm4Points(x):
-    X = scipy.zeros((4, 3))
-    X[0] = x[0]
-    X[1] = x[0] + math.norm(x[1] - x[0])
-    X[2] = x[0] + math.norm(x[2] - x[0])
-    X[3] = x[0] + math.norm(x[3] - x[0])
-
-    return X
+    mat = np.zeros((4, 3))
+    mat[0] = x[0]
+    mat[1] = x[0] + math.norm(x[1] - x[0])
+    mat[2] = x[0] + math.norm(x[2] - x[0])
+    mat[3] = x[0] + math.norm(x[3] - x[0])
+    return mat
 
 
 def calcOrthogCS(x1, x2, x3):
@@ -126,9 +125,9 @@ def calcOrthogCS(x1, x2, x3):
     Z is cross product of X and Y
     """
     o = 0.5 * (x1 + x2)
-    z = scipy.cross(x1 - o, x3 - o)
-    y = scipy.cross(z, x1 - o)
-    x = scipy.cross(y, z)
+    z = np.cross(x1 - o, x3 - o)
+    y = np.cross(z, x1 - o)
+    x = np.cross(y, z)
     x = math.norm(x)
     y = math.norm(y)
     z = math.norm(z)

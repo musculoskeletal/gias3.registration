@@ -281,7 +281,6 @@ def fitDataQR(C, basis, dataX, dataU, verbose=True):
 
     Q, R = qr(A)
     P = np.dot(Q.T, dataU.copy())
-    pdb.set_trace()
     W = np.dot(inv(R[:R.shape[1], :]), P)  # not working, need a mapping matrix to match matrix shapes
     residual = dataU - np.dot(A, W)
     rank = -1
@@ -302,7 +301,7 @@ def fitComponentFieldKnotCoordWidth(RBFF, dataX, dataU, fullOutput=False, xtol=1
 
         knotCoords = X[:(nKnots * RBFF.nComponents)].reshape((nKnots, RBFF.nComponents))
         knotWidths = X[(nKnots * RBFF.nComponents):]
-        RBFF.setCentres(knotCoords, width=widths)
+        RBFF.setCentres(knotCoords, width=knotWidths)
         W, (res, rank, singVal) = RBFF.fitData(dataX, dataU, fullOutput=True)
         sys.stdout.write('rbf fit rmse: %6.4f\r' % (np.sqrt((res ** 2.0).mean())))
         sys.stdout.flush()
@@ -340,10 +339,8 @@ def fitComponentFieldKnotWidth(RBFF, dataX, dataU, fullOutput=False, xtol=1e-3, 
         return err
 
     x0 = np.array(RBFF.CWidth)
-    try:
-        xOpt, cov_x, fitInfo, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=1)
-    except:
-        pdb.set_trace()
+    xOpt, cov_x, fitInfo, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=1)
+
 
     RBFF.setCentres(knotCoords, width=xOpt)
     fitRMSE = np.sqrt((fitInfo['fvec'] ** 2.0).mean())
@@ -544,11 +541,8 @@ class RBFComponentsField(object):
                 xGroup = x[i:i + groupSize, :]
                 r = cdist(xGroup, self.C, 'euclidean')
                 B = self.basis(r)
-                try:
-                    y[:, i:i + groupSize] = np.dot(self.W, B.T) + np.dot(
-                        self.poly(xGroup[:, 0], xGroup[:, 1], xGroup[:, 2]).T, self.polyCoeffs)
-                except ValueError:
-                    pdb.set_trace()
+                y[:, i:i + groupSize] = np.dot(self.W, B.T) + np.dot(
+                    self.poly(xGroup[:, 0], xGroup[:, 1], xGroup[:, 2]).T, self.polyCoeffs)
         else:
             r = cdist(x, self.C, 'euclidean')
             B = self.basis(r)

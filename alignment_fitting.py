@@ -11,26 +11,29 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
+import logging
 
-import scipy
+import numpy as np
 from scipy.linalg import lstsq
 from scipy.optimize import leastsq, fmin
 from scipy.spatial import cKDTree
 
 from gias2.common import transform3D
 
+log = logging.getLogger(__name__)
 
-def _sampleData(data, N):
+
+def _sampleData(data, n_points):
     """
     Pick N evenly spaced points from data
     """
 
-    if N < 1:
+    if n_points < 1:
         raise ValueError('N must be > 1')
-    elif N > len(data):
+    elif n_points > len(data):
         return data
     else:
-        i = scipy.linspace(0, len(data) - 1, N).astype(int)
+        i = np.linspace(0, len(data) - 1, n_points).astype(int)
         return data[i, :]
 
 
@@ -41,7 +44,7 @@ def fitAffine(data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, outputE
     if len(data) != len(target):
         raise ValueError('data and target points must have same number of points')
 
-    rms0 = scipy.sqrt(((data - target) ** 2.0).sum(1).mean())
+    rms0 = np.sqrt(((data - target) ** 2.0).sum(1).mean())
 
     if sample is not None:
         D = _sampleData(data, sample)
@@ -51,16 +54,15 @@ def fitAffine(data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, outputE
         T = target
 
     t = transform3D.directAffine(D, T)
-    dataFitted = transform3D.transformAffine(data, t)
-    rmsOpt = scipy.sqrt(((dataFitted - target) ** 2.0).sum(1).mean())
+    data_fitted = transform3D.transformAffine(data, t)
+    rms_opt = np.sqrt(((data_fitted - target) ** 2.0).sum(1).mean())
     if verbose:
-        print('initial RMS: {}'.format(rms0))
-        print('final RMS: {}'.format(rmsOpt))
+        log.info('initial & final RMS: %s, %s', rms0, rms_opt)
 
     if outputErrors:
-        return t, dataFitted, (rms0, rmsOpt)
+        return t, data_fitted, (rms0, rms_opt)
     else:
-        return t, dataFitted
+        return t, data_fitted
 
 
 def fitTranslation(data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, outputErrors=0):
@@ -82,17 +84,16 @@ def fitTranslation(data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, ou
         return d
 
     t0 = target.mean(0) - data.mean(0)
-    # t0 = scipy.array([ 0.0, 0.0, 0.0 ])
 
-    rms0 = scipy.sqrt(obj(t0).mean())
+    rms0 = np.sqrt(obj(t0).mean())
     if verbose:
-        print('initial RMS: {}'.format(rms0))
+        log.info('initial RMS: %s', rms0)
 
     xOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
 
-    rmsOpt = scipy.sqrt(obj(xOpt).mean())
+    rmsOpt = np.sqrt(obj(xOpt).mean())
     if verbose:
-        print('final RMS: {}'.format(rmsOpt))
+        log.info('final RMS: %s', rmsOpt)
 
     dataFitted = data + xOpt
     if outputErrors:
@@ -102,7 +103,7 @@ def fitTranslation(data, target, xtol=1e-5, maxfev=0, sample=None, verbose=0, ou
 
 
 def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
-             maxfun=None, sample=None, verbose=0, epsfcn=0, outputErrors=0):
+             maxfun=None, sample=None, verbose=False, epsfcn=0, outputErrors=0):
     """ fits for tx,ty,tz,rx,ry,rz to transform points in data to points
     in target. Points in data and target are assumed to correspond by
     order
@@ -116,9 +117,9 @@ def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     else:
-        t0 = scipy.array(t0)
+        t0 = np.array(t0)
 
     if rotcentre is None:
         rotcentre = D.mean(0)
@@ -136,10 +137,10 @@ def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
             d = ((DT - T) ** 2.0).sum(1)
             return d.sum()
 
-    t0 = scipy.array(t0)
-    rms0 = scipy.sqrt(obj(t0).mean())
+    t0 = np.array(t0)
+    rms0 = np.sqrt(obj(t0).mean())
     if verbose:
-        print('initial RMS: {}'.format(rms0))
+        log.info('initial RMS: %s', rms0)
 
     if data.shape[0] >= t0.shape[0]:
         if maxfev is None:
@@ -148,9 +149,9 @@ def fitRigid(data, target, t0=None, xtol=1e-3, rotcentre=None, maxfev=None,
     else:
         xOpt = fmin(obj, t0, xtol=xtol, maxiter=maxfev, maxfun=maxfun, disp=verbose)
 
-    rmsOpt = scipy.sqrt(obj(xOpt).mean())
+    rmsOpt = np.sqrt(obj(xOpt).mean())
     if verbose:
-        print('final RMS: {}'.format(rmsOpt))
+        log.info('final RMS: %s', rmsOpt)
 
     # dataFitted = transform3D.transformRigid3DAboutCoM( data, xOpt )
     dataFitted = transform3D.transformRigid3DAboutP(data, xOpt, rotcentre)
@@ -179,19 +180,19 @@ def fitRigidFMin(data, target, t0=None, xtol=1e-3, maxfev=0, sample=None, verbos
     def obj(x):
         DT = transform3D.transformRigid3DAboutCoM(D, x)
         d = ((DT - T) ** 2.0).sum(1)
-        rmsd = scipy.sqrt(d.mean())
+        rmsd = np.sqrt(d.mean())
         return rmsd
 
-    t0 = scipy.array(t0)
-    rms0 = scipy.sqrt(obj(t0).mean())
+    t0 = np.array(t0)
+    rms0 = np.sqrt(obj(t0).mean())
     if verbose:
-        print('initial RMS: {}'.format(rms0))
+        log.info('initial RMS: %s', rms0)
 
     xOpt = fmin(obj, t0, xtol=xtol, maxiter=maxfev)
 
-    rmsOpt = scipy.sqrt(obj(xOpt).mean())
+    rmsOpt = np.sqrt(obj(xOpt).mean())
     if verbose:
-        print('final RMS: {}'.format(rmsOpt))
+        log.info('final RMS: %s', rmsOpt)
 
     dataFitted = transform3D.transformRigid3DAboutCoM(data, xOpt)
     if outputErrors:
@@ -214,9 +215,9 @@ def fitRigidScale(data, target, t0=None, xtol=1e-3, maxfev=None, sample=None, ve
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
     else:
-        t0 = scipy.array(t0)
+        t0 = np.array(t0)
 
     if data.shape[0] >= t0.shape[0]:
         def obj(x):
@@ -229,10 +230,10 @@ def fitRigidScale(data, target, t0=None, xtol=1e-3, maxfev=None, sample=None, ve
             d = ((DT - T) ** 2.0).sum(1)
             return d.sum()
 
-    t0 = scipy.array(t0)
-    rms0 = scipy.sqrt(obj(t0).mean())
+    t0 = np.array(t0)
+    rms0 = np.sqrt(obj(t0).mean())
     if verbose:
-        print('initial RMS: {}'.format(rms0))
+        log.info('initial RMS: %s', rms0)
 
     if data.shape[0] >= t0.shape[0]:
         if maxfev is None:
@@ -241,9 +242,9 @@ def fitRigidScale(data, target, t0=None, xtol=1e-3, maxfev=None, sample=None, ve
     else:
         xOpt = fmin(obj, t0, xtol=xtol, maxiter=maxfev)
 
-    rmsOpt = scipy.sqrt(obj(xOpt).mean())
+    rmsOpt = np.sqrt(obj(xOpt).mean())
     if verbose:
-        print('final RMS: {}'.format(rmsOpt))
+        log.info('final RMS: %s', rmsOpt)
 
     dataFitted = transform3D.transformRigidScale3DAboutCoM(data, xOpt)
     if outputErrors:
@@ -270,10 +271,10 @@ def fitDataRigidEPDP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=None, ou
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     TTree = cKDTree(T)
-    D = scipy.array(D)
+    D = np.array(D)
 
     def obj(t):
         DT = transform3D.transformRigid3DAboutCoM(D, t)
@@ -281,10 +282,10 @@ def fitDataRigidEPDP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=None, ou
         # print d.mean()
         return d * d
 
-    initialRMSE = scipy.sqrt(obj(t0).mean())
+    initialRMSE = np.sqrt(obj(t0).mean())
     tOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
     dataFitted = transform3D.transformRigid3DAboutCoM(data, tOpt)
-    finalRMSE = scipy.sqrt(obj(tOpt).mean())
+    finalRMSE = np.sqrt(obj(tOpt).mean())
     # print 'fitDataRigidEPDP finalRMSE:', finalRMSE
 
     if outputErrors:
@@ -307,21 +308,21 @@ def fitDataTranslateEPDP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=None
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0])
+        t0 = np.array([0.0, 0.0, 0.0])
 
     TTree = cKDTree(T)
-    D = scipy.array(D)
+    D = np.array(D)
 
     def obj(t):
-        DT = transform3D.transformRigid3DAboutCoM(D, scipy.hstack((t, [0.0, 0.0, 0.0])))
+        DT = transform3D.transformRigid3DAboutCoM(D, np.hstack((t, [0.0, 0.0, 0.0])))
         d = TTree.query(list(DT))[0]
         # ~ print d.mean()
         return d * d
 
-    initialRMSE = scipy.sqrt(obj(t0).mean())
+    initialRMSE = np.sqrt(obj(t0).mean())
     tOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
-    dataFitted = transform3D.transformRigid3DAboutCoM(data, scipy.hstack((tOpt, [0.0, 0.0, 0.0])))
-    finalRMSE = scipy.sqrt(obj(tOpt).mean())
+    dataFitted = transform3D.transformRigid3DAboutCoM(data, np.hstack((tOpt, [0.0, 0.0, 0.0])))
+    finalRMSE = np.sqrt(obj(tOpt).mean())
 
     if outputErrors:
         return tOpt, dataFitted, (initialRMSE, finalRMSE)
@@ -343,9 +344,9 @@ def fitDataRigidDPEP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=None, ou
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-    D = scipy.array(D)
+    D = np.array(D)
 
     def obj(t):
         DT = transform3D.transformRigid3DAboutCoM(D, t)
@@ -354,11 +355,11 @@ def fitDataRigidDPEP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=None, ou
         # ~ print d.mean()
         return d * d
 
-    initialRMSE = scipy.sqrt(obj(t0).mean())
+    initialRMSE = np.sqrt(obj(t0).mean())
     tOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
     # tOpt = least_squares(obj, t0, method='trf', loss='arctan', f_scale=5.0, xtol=xtol)['x']
     dataFitted = transform3D.transformRigid3DAboutCoM(data, tOpt)
-    finalRMSE = scipy.sqrt(obj(tOpt).mean())
+    finalRMSE = np.sqrt(obj(tOpt).mean())
 
     if outputErrors:
         return tOpt, dataFitted, (initialRMSE, finalRMSE)
@@ -380,10 +381,10 @@ def fitDataRigidScaleEPDP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=Non
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
 
     TTree = cKDTree(T)
-    D = scipy.array(D)
+    D = np.array(D)
 
     if scaleThreshold is not None:
         # print 'scale penalty on'
@@ -402,10 +403,10 @@ def fitDataRigidScaleEPDP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=Non
             d = TTree.query(list(DT))[0]
             return d * d
 
-    initialRMSE = scipy.sqrt(obj(t0).mean())
+    initialRMSE = np.sqrt(obj(t0).mean())
     tOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
     dataFitted = transform3D.transformRigidScale3DAboutCoM(data, tOpt)
-    finalRMSE = scipy.sqrt(obj(tOpt).mean())
+    finalRMSE = np.sqrt(obj(tOpt).mean())
 
     if outputErrors:
         return tOpt, dataFitted, (initialRMSE, finalRMSE)
@@ -427,15 +428,16 @@ def fitDataRigidScaleDPEP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=Non
         T = target
 
     if t0 is None:
-        t0 = scipy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+        t0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
 
-    D = scipy.array(D)
+    D = np.array(D)
 
     if scaleThreshold is not None:
         def obj(t):
             DT = transform3D.transformRigidScale3DAboutCoM(D, t)
             DTTree = cKDTree(DT)
             d = DTTree.query(T)[0]
+            s = t[6]
             if s > scaleThreshold:
                 sw = 1000.0 * s
             else:
@@ -448,10 +450,10 @@ def fitDataRigidScaleDPEP(data, target, xtol=1e-5, maxfev=0, t0=None, sample=Non
             d = DTTree.query(T)[0]
             return d * d
 
-    initialRMSE = scipy.sqrt(obj(t0).mean())
+    initialRMSE = np.sqrt(obj(t0).mean())
     tOpt = leastsq(obj, t0, xtol=xtol, maxfev=maxfev)[0]
     dataFitted = transform3D.transformRigidScale3DAboutCoM(data, tOpt)
-    finalRMSE = scipy.sqrt(obj(tOpt).mean())
+    finalRMSE = np.sqrt(obj(tOpt).mean())
 
     if outputErrors:
         return tOpt, dataFitted, (initialRMSE, finalRMSE)
@@ -467,9 +469,9 @@ def fitSphere(X):
     least squares fits the sphere centre and radius to a cloud of points X
     """
     B = (X ** 2.0).sum(1)
-    A = scipy.hstack([2.0 * X, scipy.ones(X.shape[0])[:, scipy.newaxis]])
+    A = np.hstack([2.0 * X, np.ones(X.shape[0])[:, np.newaxis]])
     x, res, rank, s = lstsq(A, B)
 
     a, b, c, m = x
-    r = scipy.sqrt(m + a * a + b * b + c * c)
+    r = np.sqrt(m + a * a + b * b + c * c)
     return (a, b, c), r
