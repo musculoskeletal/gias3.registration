@@ -12,55 +12,60 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 
-import sys
 import numpy as np
-from scipy.spatial import cKDTree
+import sys
 from scipy.optimize import leastsq, least_squares
+from scipy.spatial import cKDTree
+
 from gias2.common import transform3D
 
-#=============================================================================#
+
+# =============================================================================#
 # utility functions
-#=============================================================================#
+# =============================================================================#
 def _sampleData(data, N):
     """
     Pick N evenly spaced points from data
     """
 
-    if N<1:
+    if N < 1:
         raise ValueError('N must be > 1')
-    elif N>len(data):
+    elif N > len(data):
         return data
     else:
-        i = np.linspace(0,len(data)-1,N).astype(int)
-        return data[i,:]
+        i = np.linspace(0, len(data) - 1, N).astype(int)
+        return data[i, :]
 
-def mahalanobis( x ):
-    return np.sqrt(np.multiply(x,x).sum()) 
 
-#=============================================================================#
+def mahalanobis(x):
+    return np.sqrt(np.multiply(x, x).sum())
+
+
+# =============================================================================#
 # reconstruction functions
-#=============================================================================#
+# =============================================================================#
 def r2c13(x_recon):
     """
     Reconstruction in to nx3 array of coordinates
     """
-    return x_recon.reshape((-1,3))
+    return x_recon.reshape((-1, 3))
+
 
 def r2c31(x_recon):
     """
     Reconstruction in to 3xn array of coordinates
     """
-    return x_recon.reshape((3,-1))
+    return x_recon.reshape((3, -1))
 
-#=============================================================================#
+
+# =============================================================================#
 # Main registration function
-#=============================================================================#
+# =============================================================================#
 def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
-    init_t=None, fit_scale=False, ftol=1e-6, sample=None,
-    ldmk_targs=None, ldmk_evaluator=None, ldmk_weights=None,
-    recon2coords=None, verbose=False, n_jobs=1, f_scale=None
-    ):
-    
+                     init_t=None, fit_scale=False, ftol=1e-6, sample=None,
+                     ldmk_targs=None, ldmk_evaluator=None, ldmk_weights=None,
+                     recon2coords=None, verbose=False, n_jobs=1, f_scale=None
+                     ):
     """
     Fit a shape model to a set of non-correspondent points by optimising
     translation, rotation, and PCA scores.
@@ -121,17 +126,17 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
 
     print('fitting ssm to points')
     if init_t is None:
-        init_t = np.array([0.0,0.0,0.0, 0.0,0.0,0.0])
+        init_t = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         if fit_scale:
             init_t = np.hstack([init_t, 1.0])
     else:
         init_t = np.array(init_t)
 
     if fit_scale:
-        assert(len(init_t)==7)
+        assert (len(init_t) == 7)
     else:
-        assert(len(init_t)==6)
-    
+        assert (len(init_t) == 6)
+
     if fit_inds is None:
         print('fit_inds shape: None')
     else:
@@ -140,28 +145,28 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     if sample is not None:
         data = _sampleData(data, sample)
 
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # define reconstruction functions
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     def _recon_no_scale(X):
         recon = ssm.reconstruct(
-                    ssm.getWeightsBySD(fit_comps, X[6:]), fit_comps
-                    )
+            ssm.getWeightsBySD(fit_comps, X[6:]), fit_comps
+        )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigid3DAboutCoM(
-                        recon2coords(recon), X[:6]
-                        )
+            recon2coords(recon), X[:6]
+        )
         mahalanobis_dist = mahalanobis(X[6:])
         return recon_pts, mahalanobis_dist
 
     def _recon_scale(X):
         recon = ssm.reconstruct(
-                    ssm.getWeightsBySD(fit_comps, X[7:]), fit_comps
-                    )
+            ssm.getWeightsBySD(fit_comps, X[7:]), fit_comps
+        )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigidScale3DAboutCoM(
-                        recon2coords(recon), X[:7]
-                        )
+            recon2coords(recon), X[:7]
+        )
         mahalanobis_dist = mahalanobis(X[7:])
         return recon_pts, mahalanobis_dist
 
@@ -170,26 +175,27 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     else:
         _recon = _recon_no_scale
 
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # define distance error functions
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     targ_tree = cKDTree(data)
+
     def _dist_sptp(recon_pts, m):
-        return targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0] + mw*m
+        return targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
 
     def _dist_tpsp(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw*m
+        return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
 
     def _dist_2way(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
         d_sptp = targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0]
         d_tpsp = recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0]
-        dm = mw*m
+        dm = mw * m
         return np.hstack([d_sptp, d_tpsp]) + dm
 
     def _dist_corr(recon_pts, m):
-        return np.sqrt(((data - recon_pts)**2.0).sum(1))
+        return np.sqrt(((data - recon_pts) ** 2.0).sum(1))
 
     fit_modes_map = {
         'st': _dist_sptp,
@@ -203,9 +209,9 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     except KeyError:
         raise ValueError('invalid fit mode {}'.format(fit_mode))
 
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # define objective functions
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     def _obj_no_ldmks(X):
         # reconstruct data points
         recon_data, mdist = _recon(X)
@@ -218,7 +224,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         err = _dist(recon_data, mdist)
 
         if verbose:
-            sys.stdout.write( '\robj rms:'+str(np.sqrt(err.mean())) )
+            sys.stdout.write('\robj rms:' + str(np.sqrt(err.mean())))
             sys.stdout.flush()
 
         return err
@@ -230,33 +236,33 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
 
         # calc error
         err_data = _dist(recon_data, mdist)
-        
-        err_ldmks = ((ldmk_targs - recon_ldmks)**2.0).sum(1)*ldmk_weights
+
+        err_ldmks = ((ldmk_targs - recon_ldmks) ** 2.0).sum(1) * ldmk_weights
         err = np.hstack([err_data, err_ldmks])
 
         if verbose:
             sys.stdout.write(
-                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)'%\
+                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)' % \
                 (np.sqrt(err.mean()), np.sqrt(err_data.mean()), np.sqrt(err_ldmks.mean()))
-                )
+            )
             sys.stdout.flush()
 
         return err
-    
+
     if ldmk_targs is None:
         _obj = _obj_no_ldmks
     else:
         _obj = _obj_ldmks
 
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     # fit
-    #-------------------------------------------------------------------------#
+    # -------------------------------------------------------------------------#
     x0 = np.hstack([init_t, np.zeros(len(fit_comps), dtype=float)])
-    
+
     if verbose:
         recon_data_init, mdist_init = _recon(x0)
         err_init = _obj(x0)
-        dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0)**2.0).mean())
+        dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0) ** 2.0).mean())
         print('\ninitial rms distance: {}'.format(dist_init_rms))
 
     if f_scale is None:
@@ -264,11 +270,11 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     else:
         x_opt = least_squares(
             _obj, x0, method='trf', loss='soft_l1', f_scale=f_scale, ftol=ftol, verbose=0
-            )['x']
-        
+        )['x']
+
     recon_data_opt, mdist_opt = _recon(x_opt)
     err_opt = _obj(x_opt)
-    dist_opt_rms = np.sqrt((_dist(recon_data_opt, 0.0)**2.0).mean())
+    dist_opt_rms = np.sqrt((_dist(recon_data_opt, 0.0) ** 2.0).mean())
 
     if verbose:
         print('\nfinal rms distance: {}'.format(dist_opt_rms))
