@@ -11,6 +11,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
+import logging
 
 import numpy as np
 import sys
@@ -25,6 +26,8 @@ if sys.version_info.major < 3:
     import cPickle as pickle
 else:
     import pickle
+
+log = logging.getLogger(__name__)
 
 
 # =============================================================================#
@@ -210,14 +213,14 @@ def xDist1D(x, X):
 
 def fitData(C, basis, dataX, dataU, verbose=True):
     if verbose:
-        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     # ~ pdb.set_trace()
     if len(dataX) > groupSize:
         A = np.zeros((len(dataX), len(C)))
         for i in range(0, len(dataX), groupSize):
-            # print(str(i)+' - '+str(i+groupSize))
+            # log.debug(str(i)+' - '+str(i+groupSize))
             A[i:i + groupSize, :] = basis(cdist(dataX[i:i + groupSize, :], C))
     else:
         A = basis(cdist(dataX, C))
@@ -232,14 +235,14 @@ def fitData(C, basis, dataX, dataU, verbose=True):
 
 def fitDataPoly3D(C, basis, dataX, dataU, poly, verbose=True):
     if verbose:
-        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     # ~ pdb.set_trace()
     if len(dataX) > groupSize:
         A = np.zeros((len(dataX), len(C)))
         for i in range(0, len(dataX), groupSize):
-            # print(str(i)+' - '+str(i+groupSize))
+            # log.debug(str(i)+' - '+str(i+groupSize))
             A[i:i + groupSize, :] = basis(cdist(dataX[i:i + groupSize, :], C))
     else:
         A = basis(cdist(dataX, C))
@@ -267,7 +270,7 @@ def fitDataPoly3D(C, basis, dataX, dataU, poly, verbose=True):
 
 def fitDataQR(C, basis, dataX, dataU, verbose=True):
     if verbose:
-        print('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     # ~ pdb.set_trace()
@@ -500,7 +503,7 @@ class RBFComponentsField(object):
             return self.evalManyPoly3D(x)
 
         if self.verbose:
-            print('evaluating at ' + str(len(x)) + ' points')
+            log.debug('evaluating at ' + str(len(x)) + ' points')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -527,7 +530,7 @@ class RBFComponentsField(object):
         evaluate the value of the field at points x
         """
         if self.verbose:
-            print('evaluating at ' + str(len(x)) + ' points poly')
+            log.debug('evaluating at ' + str(len(x)) + ' points poly')
         # calculate distance from each x to each rbf centre
         # row i of D contains the distances of each rbf centre to point
         # x[i] 
@@ -649,14 +652,14 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
     # find correspondence
     if disttype == 'st':
         # find closest target point to each source point
-        # print('using ts')
+        # log.debug('using ts')
         targetTree = cKDTree(target)
         closestInds = targetTree.query(source)[1]
         X = source
         Y = target[closestInds]
     elif disttype == 'ts':
         # find closest source point to each target point
-        # print('using ts')
+        # log.debug('using ts')
         sourceTree = cKDTree(source)
         closestInds = sourceTree.query(target)[1]
         X = source[closestInds]
@@ -674,7 +677,7 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
     d = np.sqrt(((X - Y) ** 2.0).sum(1))
     dRms = np.sqrt((d * d).mean())
     if verbose:
-        print('RMS distance: {}'.format(dRms))
+        log.debug('RMS distance: {}'.format(dRms))
 
     return sourceReg, dRms, rcf, d
 
@@ -682,18 +685,18 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
 def _checkTermination(it, cost1, cost0, nknots, xtol, max_it, max_knots, verbose=True):
     if it > max_it:
         if verbose:
-            print('terminating because max iterations reached')
+            log.debug('terminating because max iterations reached')
         return True
 
     if nknots > max_knots:
         if verbose:
-            print('terminating because max knots reached')
+            log.debug('terminating because max knots reached')
         return True
 
     if (abs(cost1 - cost0) / cost0) < xtol:
-        print(abs(cost1 - cost0) / cost0)
+        log.debug(abs(cost1 - cost0) / cost0)
         if verbose:
-            print('terminating because xtol reached')
+            log.debug('terminating because xtol reached')
         return True
 
     return False
@@ -787,7 +790,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
         # add knot
         if not terminate:
             if verbose:
-                print('\niteration {}'.format(it))
+                log.debug('\niteration {}'.format(it))
             # find source locations with highest errors
             sourceTree = cKDTree(sourceNew)
             tsDist, tsInds = sourceTree.query(target, k=1)
@@ -810,7 +813,7 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
             if nKnotsAdded == 0:
                 terminate = True
                 if verbose:
-                    print('terminating because no new knots can be added')
+                    log.debug('terminating because no new knots can be added')
 
         sourceCurrent = sourceNew
         ssdistCurrent = ssdistNew
@@ -907,7 +910,7 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
 
         # add knot
         if not terminate:
-            print('\niteration {}'.format(it))
+            log.debug('\niteration {}'.format(it))
             # find source locations with highest errors
             sourceTree = cKDTree(sourceNew)
             tsDist, tsInds = sourceTree.query(target, k=1)
@@ -929,7 +932,7 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
 
             if nKnotsAdded == 0:
                 terminate = True
-                print('terminating because no new knots can be added')
+                log.debug('terminating because no new knots can be added')
 
         sourceCurrent = sourceNew
         ssdistCurrent = ssdistNew
@@ -1032,7 +1035,7 @@ def rbfRegIterative3(source, target, distmode='ts', knots=None,
 
         # add knot
         if not terminate:
-            print('\niteration {}'.format(it))
+            log.debug('\niteration {}'.format(it))
             # find source locations with highest errors
             sourceTree = cKDTree(sourceNew)
             tsDist, tsInds = sourceTree.query(target, k=1)
@@ -1055,7 +1058,7 @@ def rbfRegIterative3(source, target, distmode='ts', knots=None,
 
             if nKnotsAdded == 0:
                 terminate = True
-                print('terminating because no new knots can be added')
+                log.debug('terminating because no new knots can be added')
 
         sourceCurrent = sourceNew
         ssdistCurrent = ssdistNew
@@ -1174,13 +1177,13 @@ def rbfRegNPass(source, target, init_rot=(0, 0, 0), rbfargs=None, verbose=False)
     _source = source_reg2
     for it, rbfargs_i in enumerate(rbfargs):
         if verbose:
-            print('RBF registration pass {}'.format(it + 1))
+            log.debug('RBF registration pass {}'.format(it + 1))
 
         _source, rms_i, rcf_i, regHist = rbfRegIterative(
             _source, target, verbose=verbose, **rbfargs_i
         )
 
     if verbose:
-        print('RBF registration final rms: {}'.format(rms_i))
+        log.debug('RBF registration final rms: {}'.format(rms_i))
 
     return _source, (rms_i, rcf_i)

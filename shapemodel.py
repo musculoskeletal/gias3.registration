@@ -11,6 +11,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
+import logging
 
 import numpy as np
 import sys
@@ -18,6 +19,8 @@ from scipy.optimize import leastsq, least_squares
 from scipy.spatial import cKDTree
 
 from gias2.common import transform3D
+
+log = logging.getLogger(__name__)
 
 
 # =============================================================================#
@@ -124,7 +127,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         # nx3 point clouds.
         recon2coords = r2c13
 
-    print('fitting ssm to points')
+    log.debug('fitting ssm to points')
     if init_t is None:
         init_t = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         if fit_scale:
@@ -138,9 +141,9 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         assert (len(init_t) == 6)
 
     if fit_inds is None:
-        print('fit_inds shape: None')
+        log.debug('fit_inds shape: None')
     else:
-        print('fit_inds shape:', fit_inds.shape)
+        log.debug('fit_inds shape:', fit_inds.shape)
 
     if sample is not None:
         data = _sampleData(data, sample)
@@ -263,7 +266,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         recon_data_init, mdist_init = _recon(x0)
         err_init = _obj(x0)
         dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0) ** 2.0).mean())
-        print('\ninitial rms distance: {}'.format(dist_init_rms))
+        log.debug('\ninitial rms distance: {}'.format(dist_init_rms))
 
     if f_scale is None:
         x_opt = leastsq(_obj, x0, ftol=ftol)[0]
@@ -277,6 +280,6 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     dist_opt_rms = np.sqrt((_dist(recon_data_opt, 0.0) ** 2.0).mean())
 
     if verbose:
-        print('\nfinal rms distance: {}'.format(dist_opt_rms))
+        log.debug('\nfinal rms distance: {}'.format(dist_opt_rms))
 
     return x_opt, recon_data_opt, (err_opt, dist_opt_rms, mdist_opt)
