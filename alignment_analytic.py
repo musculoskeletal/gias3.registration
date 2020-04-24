@@ -11,13 +11,12 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
-from typing import Union, List, Tuple
+from typing import Tuple
 
 import numpy as np
 
 from gias2.common import math
 from gias2.common import transform3D
-from gias2.image_analysis.image_tools import Scan
 
 
 def norm(v: np.ndarray) -> np.ndarray:
@@ -30,46 +29,19 @@ def calcAffine(old: np.ndarray, new: np.ndarray) -> np.ndarray:
     where pAxes = [X, Y, Z] where X, Y and Z are column vectors
     """
 
-    dataLandmarks = np.array([old[0],
+    data_landmarks = np.array([old[0],
                               np.add(old[0], old[1][:, 0]),
                               np.add(old[0], old[1][:, 1]),
                               np.add(old[0], old[1][:, 2])])
 
-    targetLandmarks = np.array([new[0],
+    target_landmarks = np.array([new[0],
                                 np.add(new[0], new[1][:, 0]),
                                 np.add(new[0], new[1][:, 1]),
                                 np.add(new[0], new[1][:, 2])])
 
-    affineMatrix = transform3D.directAffine(dataLandmarks, targetLandmarks)
+    affineMatrix = transform3D.directAffine(data_landmarks, target_landmarks)
 
     return affineMatrix
-
-
-def scaleAlignScan(scan: Scan, s: Union[list, tuple, np.ndarray]) -> Tuple[Scan, List[np.ndarray]]:
-    """ affine transform scan to line up its principal axes with global
-    x ,y, z at the centre of mass, and scales by 3-tuple s
-    
-    returns pointer to scan object, and [CoM, pAxes] after scaling,
-    before alignment.
-    """
-
-    scale_matrix = np.array([[1 / s[0], 0.0, 0.0],
-                             [0.0, 1 / s[1], 0.0],
-                             [0.0, 0.0, 1 / s[2]]])
-
-    scan.affine(scale_matrix, order=3)
-    old_com = list(scan.CoM)
-    old_p_axes = np.array(scan.pAxes)
-    # ~ scan.crop( 10 )
-
-    target_landmarks = np.ndarray([old_com, np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])])
-    data_landmarks = np.ndarray([old_com, old_p_axes])
-    align_matrix = calcAffine(target_landmarks, data_landmarks)  # affine is the otherway round
-
-    scan.affine(align_matrix[:3, :3], offset=align_matrix[:3, -1], order=3)
-    scan.crop(10)
-
-    return scan, [old_com, old_p_axes]
 
 
 def alignAffinePoints(x: np.ndarray, u: np.ndarray, ut: np.ndarray) -> np.ndarray:

@@ -12,6 +12,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 import logging
+from typing import Callable, Tuple, Optional, Union
 
 import numpy as np
 import sys
@@ -33,7 +34,7 @@ log = logging.getLogger(__name__)
 # =============================================================================#
 # Basis functions
 # =============================================================================#
-def polyCubic3D(x, y, z):
+def polyCubic3D(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
     X0 = np.ones(x.shape[0])
     X1 = x
     X2 = y
@@ -58,41 +59,38 @@ def polyCubic3D(x, y, z):
     return np.array([X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X19])
 
 
-def polyLinear3D(x, y, z):
-    X0 = np.ones(x.shape[0])
-    X1 = x
-    X2 = y
-    X3 = z
-
-    return np.array([X0, X1, X2, X3])
-
-
-def polyConst3D(x, y, z):
-    X0 = np.ones(x.shape[0])
-
-    return np.array([X0, ])
+def polyLinear3D(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
+    x0 = np.ones(x.shape[0])
+    x1 = x
+    x2 = y
+    x3 = z
+    return np.array([x0, x1, x2, x3])
 
 
-def makeBasisBiharmonic():
+def polyConst3D(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
+    x0 = np.ones(x.shape[0])
+    return np.array([x0, ])
+
+
+def makeBasisBiharmonic() -> Callable:
     def b(r):
         return r
 
     return b
 
 
-def makeBasisGaussian(s):
+def makeBasisGaussian(s: float) -> Callable:
     """
     Gaussian basis function, normalised to integrate to 1
     """
 
     def b(r):
-        # ~ return 1.0/np.sqrt(2.0*np.pi*s) * np.exp( -0.5*r*r/(s*s) )
         return 1.0 / np.sqrt(2.0 * np.pi * s) * np.exp(-0.5 * r * r / (s * s)) + 1.0
 
     return b
 
 
-def makeBasisGaussianNonUniformWidth(s, scaling):
+def makeBasisGaussianNonUniformWidth(s: float, scaling: float) -> Callable:
     """
     Gaussian basis function, normalised to integrate to 1
     """
@@ -105,7 +103,7 @@ def makeBasisGaussianNonUniformWidth(s, scaling):
     return b
 
 
-def makeBasisNormalisedGaussianNonUniformWidth(s, scaling):
+def makeBasisNormalisedGaussianNonUniformWidth(s: float, scaling: float) -> Callable:
     """
     Gaussian basis function, normalised to integrate to 1
     """
@@ -131,14 +129,14 @@ def makeBasisNormalisedGaussianNonUniformWidth(s, scaling):
 # ~ g = 1.0/np.sqrt(2.0*np.pi*s) * np.exp( -0.5*r*r/(s*s) ) +1.0
 # ~ return g, x, y, z
 
-def makeBasisMultiQuadric(c):
+def makeBasisMultiQuadric(c: float) -> Callable:
     def b(r):
         return np.sqrt(c * c + r * r)
 
     return b
 
 
-def makeBasisTPS():
+def makeBasisTPS() -> Callable:
     def b(r):
         x = r * r * np.log(r)
         return np.where(np.isfinite(x), x, 0.0)
@@ -146,7 +144,7 @@ def makeBasisTPS():
     return b
 
 
-def makeBasisWendlandsC31NonUniformWidth(s, scaling):
+def makeBasisWendlandsC31NonUniformWidth(s: float, scaling: float) -> Callable:
     """
     see Fornefett, Rohr, Steihl (1999) elastic registration of medical
     images using RBFs with compact support
@@ -162,7 +160,7 @@ def makeBasisWendlandsC31NonUniformWidth(s, scaling):
     return b
 
 
-def makeBasisWendlandsC32NonUniformWidth(s, scaling):
+def makeBasisWendlandsC32NonUniformWidth(s: float, scaling: float) -> Callable:
     """
     see Fornefett, Rohr, Steihl (1999) elastic registration of medical
     images using RBFs with compact support
@@ -192,64 +190,71 @@ RBFBases = {'gaussian': makeBasisGaussian,
 # =============================================================================#
 # Util functions
 # =============================================================================#
-def estimateNonUniformWidth(X, k=2):
-    XTree = cKDTree(X)
-    XNNd = XTree.query(list(X), k=k + 1)[0][:, 1:]  # 1st NN is always point itself
+def estimateNonUniformWidth(x: np.ndarray, k: int = 2) -> float:
+    XTree = cKDTree(x)
+    XNNd = XTree.query(list(x), k=k + 1)[0][:, 1:]  # 1st NN is always point itself
 
     s = np.sqrt((XNNd ** 2.0).sum(1)) / k
     return s
 
 
-def xDist(x, X):
+def xDist(x: np.ndarray, x_other: np.ndarray) -> np.ndarray:
     """ calculates the distance of x to each point in X
     """
-    v = (X - x)
+    v = (x_other - x)
     return np.sqrt((v * v).sum(1))
 
 
-def xDist1D(x, X):
-    return X - x
+def xDist1D(x: np.ndarray, x_other: np.ndarray) -> np.ndarray:
+    return x_other - x
 
 
-def fitData(C, basis, dataX, dataU, verbose=True):
+def fitData(
+        centres: np.ndarray,
+        basis: Callable,
+        data_x: np.ndarray,
+        data_u: np.ndarray,
+        verbose: bool = True) -> Tuple[np.ndarray, Tuple[float, int, float]]:
     if verbose:
-        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(centres), len(data_x)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
-    # ~ pdb.set_trace()
-    if len(dataX) > groupSize:
-        A = np.zeros((len(dataX), len(C)))
-        for i in range(0, len(dataX), groupSize):
-            # log.debug(str(i)+' - '+str(i+groupSize))
-            A[i:i + groupSize, :] = basis(cdist(dataX[i:i + groupSize, :], C))
+    if len(data_x) > groupSize:
+        A = np.zeros((len(data_x), len(centres)))
+        for i in range(0, len(data_x), groupSize):
+            A[i:i + groupSize, :] = basis(cdist(data_x[i:i + groupSize, :], centres))
     else:
-        A = basis(cdist(dataX, C))
+        A = basis(cdist(data_x, centres))
 
-    # ~ pdb.set_trace()
-    # ~ A = np.array( [ basis( xDist( d, C ) ) for d in dataX ] )
-    W, residual, rank, singVal = lstsq(A, dataU.copy(), overwrite_a=True, overwrite_b=True)
+    W, residual, rank, singVal = lstsq(A, data_u.copy(), overwrite_a=True, overwrite_b=True)
     W = W.T
 
     return W, (residual, rank, singVal)
 
 
-def fitDataPoly3D(C, basis, dataX, dataU, poly, verbose=True):
+def fitDataPoly3D(
+        centres: np.ndarray,
+        basis: Callable,
+        data_x: np.ndarray,
+        data_u: np.ndarray,
+        poly: Callable,
+        verbose: bool = True) -> Tuple[np.ndarray, np.ndarray, Tuple[float, int, float]]:
     if verbose:
-        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(centres), len(data_x)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     # ~ pdb.set_trace()
-    if len(dataX) > groupSize:
-        A = np.zeros((len(dataX), len(C)))
-        for i in range(0, len(dataX), groupSize):
+    if len(data_x) > groupSize:
+        A = np.zeros((len(data_x), len(centres)))
+        for i in range(0, len(data_x), groupSize):
             # log.debug(str(i)+' - '+str(i+groupSize))
-            A[i:i + groupSize, :] = basis(cdist(dataX[i:i + groupSize, :], C))
+            A[i:i + groupSize, :] = basis(cdist(data_x[i:i + groupSize, :], centres))
     else:
-        A = basis(cdist(dataX, C))
+        A = basis(cdist(data_x, centres))
 
     # append polynomial
     # polynomial terms in 2nd dim, points in 1st dim
-    P = poly(dataX[:, 0], dataX[:, 1], dataX[:, 2]).T
+    P = poly(data_x[:, 0], data_x[:, 1], data_x[:, 2]).T
 
     AAUpper = np.hstack([A, P])
 
@@ -259,33 +264,38 @@ def fitDataPoly3D(C, basis, dataX, dataU, poly, verbose=True):
 
     AA = AAUpper
 
-    W, residual, rank, singVal = lstsq(AA, dataU.copy(), overwrite_a=True, overwrite_b=True)
+    W, residual, rank, singVal = lstsq(AA, data_u.copy(), overwrite_a=True, overwrite_b=True)
     W = W.T
 
-    rbfW = W[:C.shape[0]]
-    polyCoeff = W[C.shape[0]:]
+    rbfW = W[:centres.shape[0]]
+    polyCoeff = W[centres.shape[0]:]
 
     return rbfW, polyCoeff, (residual, rank, singVal)
 
 
-def fitDataQR(C, basis, dataX, dataU, verbose=True):
+def fitDataQR(
+        centres: np.ndarray,
+        basis: Callable,
+        data_x: np.ndarray,
+        data_u: np.ndarray,
+        verbose: bool = True) -> Tuple[np.ndarray, Tuple[float, int, float]]:
     if verbose:
-        log.debug('fitting {} knots to {} data points'.format(len(C), len(dataX)))
+        log.debug('fitting {} knots to {} data points'.format(len(centres), len(data_x)))
     # split distance matrix calculation in groups to save memory
     groupSize = 5000
     # ~ pdb.set_trace()
-    if len(dataX) > groupSize:
-        A = np.zeros((len(dataX), len(C)))
-        for i in range(0, len(dataX), groupSize):
+    if len(data_x) > groupSize:
+        A = np.zeros((len(data_x), len(centres)))
+        for i in range(0, len(data_x), groupSize):
             # print str(i)+' - '+str(i+groupSize)
-            A[i:i + groupSize, :] = basis(cdist(dataX[i:i + groupSize, :], C))
+            A[i:i + groupSize, :] = basis(cdist(data_x[i:i + groupSize, :], centres))
     else:
-        A = basis(cdist(dataX, C))
+        A = basis(cdist(data_x, centres))
 
     Q, R = qr(A)
-    P = np.dot(Q.T, dataU.copy())
+    P = np.dot(Q.T, data_u.copy())
     W = np.dot(inv(R[:R.shape[1], :]), P)  # not working, need a mapping matrix to match matrix shapes
-    residual = dataU - np.dot(A, W)
+    residual = data_u - np.dot(A, W)
     rank = -1
     singVal = -1
     W = W.T
@@ -293,65 +303,75 @@ def fitDataQR(C, basis, dataX, dataU, verbose=True):
     return W, (residual, rank, singVal)
 
 
-def fitComponentFieldKnotCoordWidth(RBFF, dataX, dataU, fullOutput=False, xtol=1e-3, maxfev=0):
+def fitComponentFieldKnotCoordWidth(
+        rbf_func: 'RBFComponentsField',
+        data_x: np.ndarray,
+        data_u: np.ndarray,
+        full_output: bool = False,
+        xtol: float = 1e-3,
+        maxfev: int = 0) -> Union[Tuple['RBFComponentsField', float, dict], 'RBFComponentsField']:
     """
     nonlinear least squares fit of knot coordinates and width
     """
 
-    nKnots = len(RBFF.C)
+    nKnots = len(rbf_func.C)
 
     def obj(X):
 
-        knotCoords = X[:(nKnots * RBFF.nComponents)].reshape((nKnots, RBFF.nComponents))
-        knotWidths = X[(nKnots * RBFF.nComponents):]
-        RBFF.setCentres(knotCoords, width=knotWidths)
-        W, (res, rank, singVal) = RBFF.fitData(dataX, dataU, fullOutput=True)
+        knot_coords = X[:(nKnots * rbf_func.nComponents)].reshape((nKnots, rbf_func.nComponents))
+        knot_widths = X[(nKnots * rbf_func.nComponents):]
+        rbf_func.setCentres(knot_coords, width=knot_widths)
+        W, (res, rank, singVal) = rbf_func.fitData(data_x, data_u, full_output=True)
         sys.stdout.write('rbf fit rmse: %6.4f\r' % (np.sqrt((res ** 2.0).mean())))
         sys.stdout.flush()
         return res
 
-    x0 = np.hstack([RBFF.C.ravel(), RBFF.CWidth])
+    x0 = np.hstack([rbf_func.C.ravel(), rbf_func.CWidth])
 
-    xOpt, cov_x, fitInfo, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=1)
-    knotCoords = xOpt[:(nKnots * RBFF.nComponents)].reshape((nKnots, RBFF.nComponents))
-    knotWidths = xOpt[(nKnots * RBFF.nComponents):]
-    RBFF.setCentres(knotCoords, width=knotWidths)
+    x_opt, cov_x, fit_info, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=True)
+    knot_coords = x_opt[:(nKnots * rbf_func.nComponents)].reshape((nKnots, rbf_func.nComponents))
+    knot_widths = x_opt[(nKnots * rbf_func.nComponents):]
+    rbf_func.setCentres(knot_coords, width=knot_widths)
 
-    fitRMSE = np.sqrt((fitInfo['fvec'] ** 2.0).mean())
+    fit_rmse = np.sqrt((fit_info['fvec'] ** 2.0).mean())
 
-    if not fullOutput:
-        return RBFF
+    if not full_output:
+        return rbf_func
     else:
-        return RBFF, fitRMSE, fitInfo
+        return rbf_func, fit_rmse, fit_info
 
 
-def fitComponentFieldKnotWidth(RBFF, dataX, dataU, fullOutput=False, xtol=1e-3, maxfev=0):
+def fitComponentFieldKnotWidth(
+        rbf_func: 'RBFComponentsField',
+        data_x: np.ndarray,
+        data_u: np.ndarray,
+        full_output: bool = False,
+        xtol: float = 1e-3,
+        maxfev: int = 0) -> Union[Tuple['RBFComponentsField', float, dict], 'RBFComponentsField']:
     """
     nonlinear least squares fit of knot width
     """
 
-    nKnots = len(RBFF.C)
-    knotCoords = np.array(RBFF.C)
+    knot_coords = np.array(rbf_func.C)
 
     def obj(widths):
-        RBFF.setCentres(knotCoords, width=widths)
-        W, (res, rank, singVal) = RBFF.fitData(dataX, dataU, fullOutput=True)
-        err = np.sqrt(((RBFF.evalMany(dataX).T - dataU) ** 2.0).sum(1))
+        rbf_func.setCentres(knot_coords, width=widths)
+        W, (res, rank, singVal) = rbf_func.fitData(data_x, data_u, full_output=True)
+        err = np.sqrt(((rbf_func.evalMany(data_x).T - data_u) ** 2.0).sum(1))
         sys.stdout.write('rbf fit rmse: %6.4f\r' % (np.sqrt((err ** 2.0).mean())))
         sys.stdout.flush()
         return err
 
-    x0 = np.array(RBFF.CWidth)
-    xOpt, cov_x, fitInfo, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=1)
+    x0 = np.array(rbf_func.CWidth)
+    x_opt, cov_x, fit_info, mesg, ier = leastsq(obj, x0, xtol=xtol, maxfev=maxfev, full_output=True)
 
+    rbf_func.setCentres(knot_coords, width=x_opt)
+    fitRMSE = np.sqrt((fit_info['fvec'] ** 2.0).mean())
 
-    RBFF.setCentres(knotCoords, width=xOpt)
-    fitRMSE = np.sqrt((fitInfo['fvec'] ** 2.0).mean())
-
-    if not fullOutput:
-        return RBFF
+    if not full_output:
+        return rbf_func
     else:
-        return RBFF, fitRMSE, fitInfo
+        return rbf_func, fitRMSE, fit_info
 
 
 polynomials = {0: polyConst3D,
@@ -373,13 +393,13 @@ class RBFComponentsField(object):
 
     CWidthNN = 5
 
-    def __init__(self, nComponents):
+    def __init__(self, n_components: int):
         self.W = None
         self.C = None
         self.U = None
         self.basis = None
         self.M = None
-        self.nComponents = nComponents
+        self.nComponents = n_components
         self.basisType = None
         self.basisArgs = {}
         self.CWidth = None
@@ -388,7 +408,7 @@ class RBFComponentsField(object):
         self.poly = None
         self.verbose = True
 
-    def save(self, filename):
+    def save(self, filename: str) -> None:
 
         d = {'CWidthNN': self.CWidthNN,
              'C': self.C,
@@ -404,7 +424,7 @@ class RBFComponentsField(object):
         with open(filename, 'w') as f:
             pickle.dump(d, f, protocol=2)
 
-    def load(self, filename):
+    def load(self, filename: str) -> None:
         with open(filename, 'r') as f:
             d = pickle.load(f)
 
@@ -415,7 +435,7 @@ class RBFComponentsField(object):
         self.U = d['U']
         self.basisType = d['basisType']
         self.basisArgs = d['basisArgs']
-        if self.basisArgs != None:
+        if self.basisArgs is not None:
             if isinstance(self.basisArgs, list) and self.basisType == 'gaussian':
                 self.basisArgs = {'s': self.basisArgs[0]}
 
@@ -432,16 +452,16 @@ class RBFComponentsField(object):
             self.polyCoeffs = None
             self.polyOrder = None
         else:
-            if self.polyOrder != None:
+            if self.polyOrder is not None:
                 self.setPolynomial(self.polyOrder)
 
-    def setCentres(self, C, width=None):
-        self.C = C
+    def setCentres(self, centres: np.ndarray, width: Optional[np.ndarray] = None) -> None:
+        self.C = centres
         M = squareform(pdist(self.C))
-        if width != None:
+        if width is not None:
             self.CWidth = width
         else:
-            self.CWidth = estimateNonUniformWidth(C, k=self.CWidthNN)
+            self.CWidth = estimateNonUniformWidth(centres, k=self.CWidthNN)
 
         if 'NonUniformWidth' in self.basisType:
             self.basisArgs['s'] = self.CWidth
@@ -449,36 +469,36 @@ class RBFComponentsField(object):
 
         self.M = self.basis(M)
 
-    def setPolynomial(self, polyOrder):
-        self.poly = polynomials[polyOrder]
+    def setPolynomial(self, poly_order: int) -> None:
+        self.poly = polynomials[poly_order]
         self.usePoly = 1
 
-    def setCentreValues(self, U):
-        if U.shape[0] != self.nComponents:
+    def setCentreValues(self, u: np.ndarray) -> None:
+        if u.shape[0] != self.nComponents:
             raise ValueError('incorrect number of components')
         else:
-            self.U = U
+            self.U = u
 
-    def setBasis(self, phi):
+    def setBasis(self, phi: Callable) -> None:
         self.basis = phi
 
-    def makeBasis(self, basisType, basisArgs):
+    def makeBasis(self, basisType: str, basisArgs: dict) -> None:
         self.basisType = basisType
         self.basisArgs = basisArgs
 
-        if self.basisArgs != None:
+        if self.basisArgs is not None:
             self.setBasis(RBFBases[self.basisType](**self.basisArgs))
         else:
             self.setBasis(RBFBases[self.basisType]())
 
-    def calcWeights(self):
+    def calcWeights(self) -> None:
         # ~ print 'solving system...'
         # ~ LUA = lu_factor(A)
         # ~ self.W = np.array([lu_solve( LUA, u ) for u in self.U])
 
         self.W = solve(self.M, self.U.T).T
 
-    def eval(self, x):
+    def eval(self, x: np.ndarray) -> np.ndarray:
         """
         evaluate the value of the field at point x
         """
@@ -487,7 +507,7 @@ class RBFComponentsField(object):
         y = (self.W * B).sum(1)
         return y
 
-    def evalMany(self, x):
+    def evalMany(self, x: np.ndarray) -> np.ndarray:
         """
         evaluate the value of the field at points x
         """
@@ -499,7 +519,7 @@ class RBFComponentsField(object):
         # ~ B = self.basis( D )
         # ~ y = np.dot(self.W, B.T)
         # ~ return y
-        if self.polyOrder != None:
+        if self.polyOrder is not None:
             return self.evalManyPoly3D(x)
 
         if self.verbose:
@@ -525,7 +545,7 @@ class RBFComponentsField(object):
 
         return y
 
-    def evalManyPoly3D(self, x):
+    def evalManyPoly3D(self, x: np.ndarray) -> np.ndarray:
         """
         evaluate the value of the field at points x
         """
@@ -554,44 +574,54 @@ class RBFComponentsField(object):
 
         return y
 
-    def fitData(self, dataX, dataU, fullOutput=True):
+    def fitData(
+            self,
+            data_x: np.ndarray,
+            data_u: np.ndarray,
+            full_output: bool = True) -> Union[np.ndarray,
+                                               Tuple[np.ndarray, Tuple],
+                                               Tuple[np.ndarray, np.ndarray]]:
         """
         calculate weights for self.C to fit to field sampled at dataX
         with field values dataU
         """
-        if self.polyOrder != None:
-            return self.fitDataPoly3D(dataX, dataU, fullOutput)
+        if self.polyOrder is not None:
+            return self.fitDataPoly3D(data_x, data_u, full_output)
 
-        if dataU.shape[1] != self.nComponents:
+        if data_u.shape[1] != self.nComponents:
             # ~ pdb.set_trace()
             raise ValueError('incorrect number of components in data')
 
         else:
             # print 'fitting data...'
             self.W, extraInfo = fitData(
-                self.C, self.basis, dataX, dataU, verbose=self.verbose
+                self.C, self.basis, data_x, data_u, verbose=self.verbose
             )
-            if fullOutput:
+            if full_output:
                 return self.W, extraInfo
             else:
                 return self.W
 
-    def fitDataPoly3D(self, dataX, dataU, fullOutput=False):
+    def fitDataPoly3D(
+            self,
+            data_x: np.ndarray,
+            data_u: np.ndarray,
+            full_output: bool = True) -> Union[Tuple[np.ndarray, np.ndarray, Tuple], Tuple[np.ndarray, np.ndarray]]:
         """
         calculate weights for self.C to fit to field sampled at dataX
         with field values dataU
         """
-        if dataU.shape[1] != self.nComponents:
+        if data_u.shape[1] != self.nComponents:
             # ~ pdb.set_trace()
             raise ValueError('incorrect number of components in data')
 
         else:
             # print 'fitting data poly...'
             self.W, self.polyCoeffs, extraInfo = fitDataPoly3D(
-                self.C, self.basis, dataX, dataU, self.poly, verbose=self.verbose
+                self.C, self.basis, data_x, data_u, self.poly, verbose=self.verbose
             )
             # ~ self.W, extraInfo = fitDataQR( self.C, self.basis, dataX, dataU )
-            if fullOutput:
+            if full_output:
                 return self.W, self.polyCoeffs, extraInfo
             else:
                 return self.W, self.polyCoeffs
@@ -601,7 +631,10 @@ class RBFComponentsField(object):
 
 # Fitting function
 # =============================================================================#
-def _generateBBoxPointsGrid(points, spacing=None, padding=None):
+def _generate_bbox_points_grid(
+        points: np.ndarray,
+        spacing: Optional[float] = None,
+        padding: Optional[float] = None) -> np.ndarray:
     """
     generate a grid of points internal to the bounding box of a set of points
     with spacing specified by tuple spacing.
@@ -624,15 +657,22 @@ def _generateBBoxPointsGrid(points, spacing=None, padding=None):
             N[ni] = 2
 
     # generate grid of points in bounding box
-    PAll = np.array([[x, y, z] for z in np.linspace(bboxMin[2], bboxMax[2], N[2]) \
-                     for y in np.linspace(bboxMin[1], bboxMax[1], N[1]) \
+    PAll = np.array([[x, y, z] for z in np.linspace(bboxMin[2], bboxMax[2], N[2])
+                     for y in np.linspace(bboxMin[1], bboxMax[1], N[1])
                      for x in np.linspace(bboxMin[0], bboxMax[0], N[0])
                      ])
 
     return PAll
 
 
-def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
+def rbfreg(
+        knots: np.ndarray,
+        source: np.ndarray,
+        target: np.ndarray,
+        basistype: str,
+        basisargs: dict,
+        disttype: str,
+        verbose: bool = True) -> Tuple[np.ndarray, float, RBFComponentsField, np.ndarray]:
     """
     Perform a single iteration of RBF registration from source to target
     data points.
@@ -653,16 +693,16 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
     if disttype == 'st':
         # find closest target point to each source point
         # log.debug('using ts')
-        targetTree = cKDTree(target)
-        closestInds = targetTree.query(source)[1]
+        target_tree = cKDTree(target)
+        closest_inds = target_tree.query(source)[1]
         X = source
-        Y = target[closestInds]
+        Y = target[closest_inds]
     elif disttype == 'ts':
         # find closest source point to each target point
         # log.debug('using ts')
-        sourceTree = cKDTree(source)
-        closestInds = sourceTree.query(target)[1]
-        X = source[closestInds]
+        source_tree = cKDTree(source)
+        closest_inds = source_tree.query(target)[1]
+        X = source[closest_inds]
         Y = target
     else:
         raise ValueError("disttype must be 'st' or 'ts'")
@@ -671,18 +711,26 @@ def rbfreg(knots, source, target, basistype, basisargs, disttype, verbose=True):
     rcf.fitData(X, Y)
 
     # evaluate registered source points
-    sourceReg = rcf.evalMany(source).T
+    source_reg = rcf.evalMany(source).T
 
     # calculated RMS distance
     d = np.sqrt(((X - Y) ** 2.0).sum(1))
-    dRms = np.sqrt((d * d).mean())
+    d_rms = np.sqrt((d * d).mean())
     if verbose:
-        log.debug('RMS distance: {}'.format(dRms))
+        log.debug('RMS distance: %s', d_rms)
 
-    return sourceReg, dRms, rcf, d
+    return source_reg, d_rms, rcf, d
 
 
-def _checkTermination(it, cost1, cost0, nknots, xtol, max_it, max_knots, verbose=True):
+def _check_termination(
+        it: int,
+        cost1: float,
+        cost0: float,
+        nknots: int,
+        xtol: float,
+        max_it: int,
+        max_knots: int,
+        verbose: bool = True) -> bool:
     if it > max_it:
         if verbose:
             log.debug('terminating because max iterations reached')
@@ -702,10 +750,19 @@ def _checkTermination(it, cost1, cost0, nknots, xtol, max_it, max_knots, verbose
     return False
 
 
-def rbfRegIterative(source, target, distmode='ts', knots=None,
-                    basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
-                    minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20, verbose=True
-                    ):
+def rbfRegIterative(
+        source: np.ndarray,
+        target: np.ndarray,
+        distmode: str = 'ts',
+        knots: Optional[np.ndarray] = None,
+        basisType: str = 'gaussianNonUniformWidth',
+        basisArgs: Optional[dict] = None,
+        xtol: float = 1e-3,
+        minKnotDist: float = 5.0,
+        maxIt: int = 50,
+        maxKnots: int = 500,
+        maxKnotsPerIt: int = 20,
+        verbose: bool = True) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
     New knots are placed on registered source points.
@@ -743,12 +800,14 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
         basisArgs = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
-        knots = _generateBBoxPointsGrid(source, padding=10.0)
+        knots = _generate_bbox_points_grid(source, padding=10.0)
 
     terminate = False
     it = 0
-    sourceCurrent = source
-    ssdistCurrent = 9999999999999
+    rms = 0.0
+    rcf = None
+    source_current = source
+    ssdist_current = 9999999999999
     history = {
         'rms': [],
         'ssdist': [],
@@ -763,27 +822,27 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
         else:
             _distmode = distmode
 
-        sourceNew, rms, rcf, dist = rbfreg(
+        source_new, rms, rcf, dist = rbfreg(
             knots,
-            sourceCurrent,
+            source_current,
             target,
             basisType,
             basisArgs,
             _distmode,
             verbose=verbose
         )
-        ssdistNew = (dist * dist).sum()
+        ssdist_new = (dist * dist).sum()
 
         # check if should terminate
         if distmode == 'alt':
             if not it % 2:
-                terminate = _checkTermination(
-                    it, ssdistNew, ssdistCurrent, knots.shape[0],
+                terminate = _check_termination(
+                    it, ssdist_new, ssdist_current, knots.shape[0],
                     xtol, maxIt, maxKnots, verbose=verbose
                 )
         else:
-            terminate = _checkTermination(
-                it, ssdistNew, ssdistCurrent, knots.shape[0],
+            terminate = _check_termination(
+                it, ssdist_new, ssdist_current, knots.shape[0],
                 xtol, maxIt, maxKnots, verbose=verbose
             )
 
@@ -792,42 +851,51 @@ def rbfRegIterative(source, target, distmode='ts', knots=None,
             if verbose:
                 log.debug('\niteration {}'.format(it))
             # find source locations with highest errors
-            sourceTree = cKDTree(sourceNew)
-            tsDist, tsInds = sourceTree.query(target, k=1)
-            sourceMaxDistInds = tsInds[np.argsort(tsDist)[::-1]]
+            source_tree = cKDTree(source_new)
+            tsDist, tsInds = source_tree.query(target, k=1)
+            source_max_dist_inds = tsInds[np.argsort(tsDist)[::-1]]
 
             # go through source points from highest error and find
             # first one that is more than min_knot_dist from an
             # existing knot
-            nKnotsAdded = 0
-            for maxInd in sourceMaxDistInds:
-                knotsTree = cKDTree(knots)
-                closestKnotDist = knotsTree.query(sourceNew[maxInd])[0]
-                if closestKnotDist > minKnotDist:
-                    knots = np.vstack([knots, sourceNew[maxInd]])
-                    nKnotsAdded += 1
+            n_knots_added = 0
+            for maxInd in source_max_dist_inds:
+                knots_tree = cKDTree(knots)
+                closest_knot_dist = knots_tree.query(source_new[maxInd])[0]
+                if closest_knot_dist > minKnotDist:
+                    knots = np.vstack([knots, source_new[maxInd]])
+                    n_knots_added += 1
 
-                if nKnotsAdded == maxKnotsPerIt:
+                if n_knots_added == maxKnotsPerIt:
                     break
 
-            if nKnotsAdded == 0:
+            if n_knots_added == 0:
                 terminate = True
                 if verbose:
                     log.debug('terminating because no new knots can be added')
 
-        sourceCurrent = sourceNew
-        ssdistCurrent = ssdistNew
+        source_current = source_new
+        ssdist_current = ssdist_new
         history['rms'].append(rms)
-        history['ssdist'].append(ssdistCurrent)
+        history['ssdist'].append(ssdist_current)
         history['nknots'].append(len(knots))
         it += 1
 
-    return sourceCurrent, rms, rcf, history
+    return source_current, rms, rcf, history
 
 
-def rbfRegIterative2(source, target, distmode='ts', knots=None,
-                     basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
-                     minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20):
+def rbfRegIterative2(
+        source: np.ndarray,
+        target: np.ndarray,
+        distmode: str = 'ts',
+        knots: Optional[np.ndarray] = None,
+        basisType: str = 'gaussianNonUniformWidth',
+        basisArgs: Optional[dict] = None,
+        xtol: float = 1e-3,
+        minKnotDist: float = 5.0,
+        maxIt: int = 50,
+        maxKnots: int = 500,
+        maxKnotsPerIt: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
     New knots are placed on source points.
@@ -852,7 +920,7 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
 
     returns
     -------
-    sourceCurrent: final morphed source point coordinates.
+    source_current: final morphed source point coordinates.
     rms: final RMS distance between morphed source and target points.
     rcf: final RBF deformation field.
     history: fitting results from each iteration. Dict containing
@@ -865,12 +933,14 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
         basisArgs = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
-        knots = _generateBBoxPointsGrid(source, padding=10.0)
+        knots = _generate_bbox_points_grid(source, padding=10.0)
 
     terminate = False
     it = 0
-    sourceCurrent = source
-    ssdistCurrent = 9999999999999
+    rms = 0.0
+    rcf = None
+    source_current = source
+    ssdist_current = 9999999999999
     history = {
         'rms': [],
         'ssdist': [],
@@ -885,26 +955,26 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
         else:
             _distmode = distmode
 
-        sourceNew, rms, rcf, dist = rbfreg(
+        source_new, rms, rcf, dist = rbfreg(
             knots,
-            sourceCurrent,
+            source_current,
             target,
             basisType,
             basisArgs,
             _distmode,
         )
-        ssdistNew = (dist * dist).sum()
+        ssdist_new = (dist * dist).sum()
 
         # check if should terminate
         if distmode == 'alt':
             if not it % 2:
-                terminate = _checkTermination(
-                    it, ssdistNew, ssdistCurrent, knots.shape[0],
+                terminate = _check_termination(
+                    it, ssdist_new, ssdist_current, knots.shape[0],
                     xtol, maxIt, maxKnots,
                 )
         else:
-            terminate = _checkTermination(
-                it, ssdistNew, ssdistCurrent, knots.shape[0],
+            terminate = _check_termination(
+                it, ssdist_new, ssdist_current, knots.shape[0],
                 xtol, maxIt, maxKnots,
             )
 
@@ -912,41 +982,50 @@ def rbfRegIterative2(source, target, distmode='ts', knots=None,
         if not terminate:
             log.debug('\niteration {}'.format(it))
             # find source locations with highest errors
-            sourceTree = cKDTree(sourceNew)
-            tsDist, tsInds = sourceTree.query(target, k=1)
-            sourceMaxDistInds = tsInds[np.argsort(tsDist)[::-1]]
+            source_tree = cKDTree(source_new)
+            ts_dist, ts_inds = source_tree.query(target, k=1)
+            source_max_dist_inds = ts_inds[np.argsort(ts_dist)[::-1]]
 
             # go through source points from highest error and find
             # first one that is more than min_knot_dist from an
             # existing knot
-            nKnotsAdded = 0
-            for maxInd in sourceMaxDistInds:
-                knotsTree = cKDTree(knots)
-                closestKnotDist = knotsTree.query(source[maxInd])[0]
-                if closestKnotDist > minKnotDist:
+            n_knots_added = 0
+            for maxInd in source_max_dist_inds:
+                knots_tree = cKDTree(knots)
+                closest_knot_dist = knots_tree.query(source[maxInd])[0]
+                if closest_knot_dist > minKnotDist:
                     knots = np.vstack([knots, source[maxInd]])
-                    nKnotsAdded += 1
+                    n_knots_added += 1
 
-                if nKnotsAdded == maxKnotsPerIt:
+                if n_knots_added == maxKnotsPerIt:
                     break
 
-            if nKnotsAdded == 0:
+            if n_knots_added == 0:
                 terminate = True
                 log.debug('terminating because no new knots can be added')
 
-        sourceCurrent = sourceNew
-        ssdistCurrent = ssdistNew
+        source_current = source_new
+        ssdist_current = ssdist_new
         history['rms'].append(rms)
-        history['ssdist'].append(ssdistCurrent)
+        history['ssdist'].append(ssdist_current)
         history['nknots'].append(len(knots))
         it += 1
 
-    return sourceCurrent, rms, rcf, history
+    return source_current, rms, rcf, history
 
 
-def rbfRegIterative3(source, target, distmode='ts', knots=None,
-                     basisType='gaussianNonUniformWidth', basisArgs=None, xtol=1e-3,
-                     minKnotDist=5.0, maxIt=50, maxKnots=500, maxKnotsPerIt=20):
+def rbfRegIterative3(
+        source: np.ndarray,
+        target: np.ndarray,
+        distmode: str = 'ts',
+        knots: Optional[list] = None,
+        basisType: str = 'gaussianNonUniformWidth',
+        basisArgs: Optional[dict] = None,
+        xtol: float = 1e-3,
+        minKnotDist: float = 5.0,
+        maxIt: int = 50,
+        maxKnots: int = 500,
+        maxKnotsPerIt: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
     Each iteration only contains it 0 knots plus those added in the last
@@ -985,7 +1064,7 @@ def rbfRegIterative3(source, target, distmode='ts', knots=None,
         basisArgs = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
-        knots0 = _generateBBoxPointsGrid(source, padding=10.0)
+        knots0 = _generate_bbox_points_grid(source, padding=10.0)
     else:
         knots0 = np.array(knots)
 
@@ -994,83 +1073,90 @@ def rbfRegIterative3(source, target, distmode='ts', knots=None,
 
     terminate = False
     it = 0
-    sourceCurrent = source
-    ssdistCurrent = 9999999999999
+    rms = 0.0
+    rcf = None
+    source_current = source
+    ss_dist_current = 9999999999999
     history = {
         'rms': [],
         'ssdist': [],
         'nknots': [],
     }
-    distmodes = ['ts', 'st']
+    dist_modes = ['ts', 'st']
     while not terminate:
 
         # perform fit
         if distmode == 'alt':
-            _distmode = distmodes[it % 2]
+            _distmode = dist_modes[it % 2]
         else:
             _distmode = distmode
 
-        sourceNew, rms, rcf, dist = rbfreg(
+        source_new, rms, rcf, dist = rbfreg(
             knots,
-            sourceCurrent,
+            source_current,
             target,
             basisType,
             basisArgs,
             _distmode,
         )
-        ssdistNew = (dist * dist).sum()
+        ssdist_new = (dist * dist).sum()
 
         # check if should terminate
         if distmode == 'alt':
             if not it % 2:
-                terminate = _checkTermination(
-                    it, ssdistNew, ssdistCurrent, knots.shape[0],
+                terminate = _check_termination(
+                    it, ssdist_new, ss_dist_current, knots.shape[0],
                     xtol, maxIt, maxKnots,
                 )
         else:
-            terminate = _checkTermination(
-                it, ssdistNew, ssdistCurrent, knots.shape[0],
+            terminate = _check_termination(
+                it, ssdist_new, ss_dist_current, knots.shape[0],
                 xtol, maxIt, maxKnots,
             )
 
         # add knot
         if not terminate:
-            log.debug('\niteration {}'.format(it))
+            log.debug('iteration {}'.format(it))
             # find source locations with highest errors
-            sourceTree = cKDTree(sourceNew)
-            tsDist, tsInds = sourceTree.query(target, k=1)
-            sourceMaxDistInds = tsInds[np.argsort(tsDist)[::-1]]
+            source_tree = cKDTree(source_new)
+            ts_dist, ts_inds = source_tree.query(target, k=1)
+            source_max_dist_inds = ts_inds[np.argsort(ts_dist)[::-1]]
 
             # go through source points from highest error and find
             # first one that is more than min_knot_dist from an
             # existing knot
-            nKnotsAdded = 0
+            n_knots_added = 0
             knots = np.array(knots0)
-            for maxInd in sourceMaxDistInds:
-                knotsTree = cKDTree(knots)
-                closestKnotDist = knotsTree.query(source[maxInd])[0]
-                if closestKnotDist > minKnotDist:
+            for maxInd in source_max_dist_inds:
+                knots_tree = cKDTree(knots)
+                closest_knot_dist = knots_tree.query(source[maxInd])[0]
+                if closest_knot_dist > minKnotDist:
                     knots = np.vstack([knots, source[maxInd]])
-                    nKnotsAdded += 1
+                    n_knots_added += 1
 
-                if nKnotsAdded == maxKnotsPerIt:
+                if n_knots_added == maxKnotsPerIt:
                     break
 
-            if nKnotsAdded == 0:
+            if n_knots_added == 0:
                 terminate = True
                 log.debug('terminating because no new knots can be added')
 
-        sourceCurrent = sourceNew
-        ssdistCurrent = ssdistNew
+        source_current = source_new
+        ss_dist_current = ssdist_new
         history['rms'].append(rms)
-        history['ssdist'].append(ssdistCurrent)
+        history['ssdist'].append(ss_dist_current)
         history['nknots'].append(len(knots))
         it += 1
 
-    return sourceCurrent, rms, rcf, history
+    return source_current, rms, rcf, history
 
 
-def rbfRegNPass(source, target, init_rot=(0, 0, 0), rbfargs=None, verbose=False):
+def rbfRegNPass(
+        source: np.ndarray,
+        target: np.ndarray,
+        init_rot: Tuple = (0, 0, 0),
+        rbfargs: dict = None,
+        verbose: bool = False) -> Tuple[np.ndarray, Tuple[float, RBFComponentsField]]:
     """
     Multi-pass RBF fitting from source to target point clouds.
 
@@ -1147,13 +1233,12 @@ def rbfRegNPass(source, target, init_rot=(0, 0, 0), rbfargs=None, verbose=False)
         ]
 
     init_rot = np.deg2rad(init_rot)
-    n_iterations = len(rbfargs)
 
     # =============================================================#
     # rigidly register source points to target points
     init_trans = target.mean(0) - source.mean(0)
     t0 = np.hstack([init_trans, init_rot])
-    reg1_T, source_reg1, reg1_errors = af.fitDataRigidDPEP(
+    reg1_t, source_reg1, reg1_errors = af.fitDataRigidDPEP(
         source,
         target,
         xtol=1e-6,
@@ -1163,24 +1248,26 @@ def rbfRegNPass(source, target, init_rot=(0, 0, 0), rbfargs=None, verbose=False)
     )
 
     # add isotropic scaling to rigid registration
-    reg2_T, source_reg2, reg2_errors = af.fitDataRigidScaleDPEP(
+    reg2_t, source_reg2, reg2_errors = af.fitDataRigidScaleDPEP(
         source,
         target,
         xtol=1e-6,
         sample=1000,
-        t0=np.hstack([reg1_T, 1.0]),
+        t0=np.hstack([reg1_t, 1.0]),
         outputErrors=1,
     )
 
     # =============================================================#
 
     _source = source_reg2
-    for it, rbfargs_i in enumerate(rbfargs):
+    rms_i = 0.0
+    rcf_i = None
+    for it, rbf_args_i in enumerate(rbfargs):
         if verbose:
             log.debug('RBF registration pass {}'.format(it + 1))
 
-        _source, rms_i, rcf_i, regHist = rbfRegIterative(
-            _source, target, verbose=verbose, **rbfargs_i
+        _source, rms_i, rcf_i, reg_hist = rbfRegIterative(
+            _source, target, verbose=verbose, **rbf_args_i
         )
 
     if verbose:
