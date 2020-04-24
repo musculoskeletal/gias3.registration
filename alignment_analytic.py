@@ -11,19 +11,21 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
+from typing import Union, List, Tuple
 
 import numpy as np
 
 from gias2.common import math
 from gias2.common import transform3D
+from gias2.image_analysis.image_tools import Scan
 
 
-def norm(v):
+def norm(v: np.ndarray) -> np.ndarray:
     m = np.sqrt((v.astype(float) ** 2.0).sum())
     return v / m
 
 
-def calcAffine(old, new):
+def calcAffine(old: np.ndarray, new: np.ndarray) -> np.ndarray:
     """ calc affine matrix to transform old(origin, pAxes) to new(origin, pAxes)
     where pAxes = [X, Y, Z] where X, Y and Z are column vectors
     """
@@ -43,7 +45,7 @@ def calcAffine(old, new):
     return affineMatrix
 
 
-def scaleAlignScan(scan, s):
+def scaleAlignScan(scan: Scan, s: Union[list, tuple, np.ndarray]) -> Tuple[Scan, List[np.ndarray]]:
     """ affine transform scan to line up its principal axes with global
     x ,y, z at the centre of mass, and scales by 3-tuple s
     
@@ -52,16 +54,16 @@ def scaleAlignScan(scan, s):
     """
 
     scale_matrix = np.array([[1 / s[0], 0.0, 0.0],
-                            [0.0, 1 / s[1], 0.0],
-                            [0.0, 0.0, 1 / s[2]]])
+                             [0.0, 1 / s[1], 0.0],
+                             [0.0, 0.0, 1 / s[2]]])
 
     scan.affine(scale_matrix, order=3)
     old_com = list(scan.CoM)
     old_p_axes = np.array(scan.pAxes)
     # ~ scan.crop( 10 )
 
-    target_landmarks = [old_com, np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])]
-    data_landmarks = [old_com, old_p_axes]
+    target_landmarks = np.ndarray([old_com, np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])])
+    data_landmarks = np.ndarray([old_com, old_p_axes])
     align_matrix = calcAffine(target_landmarks, data_landmarks)  # affine is the otherway round
 
     scan.affine(align_matrix[:3, :3], offset=align_matrix[:3, -1], order=3)
@@ -70,16 +72,16 @@ def scaleAlignScan(scan, s):
     return scan, [old_com, old_p_axes]
 
 
-def alignAffinePoints(X, u, ut):
+def alignAffinePoints(x: np.ndarray, u: np.ndarray, ut: np.ndarray) -> np.ndarray:
     """
     based on 4 pairs of points in u and ut, calculate and apply an affine
     transform to X
     """
     t = transform3D.directAffine(u, ut)
-    return transform3D.transformAffine(X, t)
+    return transform3D.transformAffine(x, t)
 
 
-def calcAffineRigid3Points(p1, p2):
+def calcAffineRigid3Points(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
     """ calculates rigid affine matrix that transforms
     p1 to p2
     """
@@ -98,16 +100,16 @@ def calcAffineRigid3Points(p1, p2):
     return transform3D.directAffine(U, UT)
 
 
-def alignRigid3Points(X, u, ut):
+def alignRigid3Points(x: np.ndarray, u: np.ndarray, ut: np.ndarray) -> np.ndarray:
     """
     based on 3 pairs of points in u and ut, calculate and apply a rigid
     transform to X
     """
     t = calcAffineRigid3Points(u, ut)
-    return transform3D.transformAffine(X, t)
+    return transform3D.transformAffine(x, t)
 
 
-def norm4Points(x):
+def norm4Points(x: np.ndarray) -> np.ndarray:
     mat = np.zeros((4, 3))
     mat[0] = x[0]
     mat[1] = x[0] + math.norm(x[1] - x[0])
@@ -116,7 +118,10 @@ def norm4Points(x):
     return mat
 
 
-def calcOrthogCS(x1, x2, x3):
+def calcOrthogCS(
+        x1: np.ndarray,
+        x2: np.ndarray,
+        x3: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculates an orthogonal CS using 3 points.
     Origin is midpoint between x1 and x2
