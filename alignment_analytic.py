@@ -24,8 +24,9 @@ def norm(v: np.ndarray) -> np.ndarray:
     return v / m
 
 
-def calcAffine(old: np.ndarray, new: np.ndarray) -> np.ndarray:
-    """ calc affine matrix to transform old(origin, pAxes) to new(origin, pAxes)
+def calcAffine(old: Tuple[np.ndarray, np.ndarray], new: Tuple[np.ndarray, np.ndarray]) -> np.ndarray:
+    """
+    calc affine matrix to transform old(origin, pAxes) to new(origin, pAxes)
     where pAxes = [X, Y, Z] where X, Y and Z are column vectors
     """
 
@@ -39,9 +40,9 @@ def calcAffine(old: np.ndarray, new: np.ndarray) -> np.ndarray:
                                 np.add(new[0], new[1][:, 1]),
                                 np.add(new[0], new[1][:, 2])])
 
-    affineMatrix = transform3D.directAffine(data_landmarks, target_landmarks)
+    affine_matrix = transform3D.directAffine(data_landmarks, target_landmarks)
 
-    return affineMatrix
+    return affine_matrix
 
 
 def alignAffinePoints(x: np.ndarray, u: np.ndarray, ut: np.ndarray) -> np.ndarray:
