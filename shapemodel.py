@@ -12,6 +12,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 import logging
+from typing import List, Optional, Union, Callable, Tuple
 
 import numpy as np
 import sys
@@ -19,6 +20,7 @@ from scipy.optimize import leastsq, least_squares
 from scipy.spatial import cKDTree
 
 from gias2.common import transform3D
+from gias2.learning.PCA import PrincipalComponents
 
 log = logging.getLogger(__name__)
 
@@ -26,35 +28,38 @@ log = logging.getLogger(__name__)
 # =============================================================================#
 # utility functions
 # =============================================================================#
-def _sampleData(data, N):
+def _sample_data(data: np.ndarray, n: int) -> np.ndarray:
     """
-    Pick N evenly spaced points from data
+    Pick N evenly spaced rows from data
     """
 
-    if N < 1:
+    if n < 1:
         raise ValueError('N must be > 1')
-    elif N > len(data):
+    elif n > len(data):
         return data
     else:
-        i = np.linspace(0, len(data) - 1, N).astype(int)
+        i = np.linspace(0, len(data) - 1, n).astype(int)
         return data[i, :]
 
 
-def mahalanobis(x):
+def mahalanobis(x: np.ndarray) -> float:
+    """
+    Calculate the mahalanobis distance on an array of standard deviations
+    """
     return np.sqrt(np.multiply(x, x).sum())
 
 
 # =============================================================================#
 # reconstruction functions
 # =============================================================================#
-def r2c13(x_recon):
+def r2c13(x_recon: np.ndarray) -> np.ndarray:
     """
     Reconstruction in to nx3 array of coordinates
     """
     return x_recon.reshape((-1, 3))
 
 
-def r2c31(x_recon):
+def r2c31(x_recon: np.ndarray) -> np.ndarray:
     """
     Reconstruction in to 3xn array of coordinates
     """
@@ -64,11 +69,24 @@ def r2c31(x_recon):
 # =============================================================================#
 # Main registration function
 # =============================================================================#
-def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
-                     init_t=None, fit_scale=False, ftol=1e-6, sample=None,
-                     ldmk_targs=None, ldmk_evaluator=None, ldmk_weights=None,
-                     recon2coords=None, verbose=False, n_jobs=1, f_scale=None
-                     ):
+def fitSSMTo3DPoints(
+        data: np.ndarray,
+        ssm: PrincipalComponents,
+        fit_comps: List[int],
+        fit_mode: str,
+        fit_inds: Optional[Union[list, np.ndarray]] = None,
+        mw: float = 0.0,
+        init_t: Optional[np.ndarray] = None,
+        fit_scale: bool = False,
+        ftol: float = 1e-6,
+        sample: Optional[int] = None,
+        ldmk_targs: Optional[np.ndarray] = None,
+        ldmk_evaluator: Optional[List[Callable]] = None,
+        ldmk_weights: Optional[np.ndarray] = None,
+        recon2coords: Optional[Callable] = None,
+        verbose: bool = False,
+        n_jobs: int = 1,
+        f_scale: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, float, float]]:
     """
     Fit a shape model to a set of non-correspondent points by optimising
     translation, rotation, and PCA scores.
@@ -87,10 +105,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         covers less of the object than the shape model. Use 2 way if neither st
         ts produces good results. Use corr if the target datacloud is
         correspondent with the points in the shape model.
-    
-    keyword arguments
-    -----------------
-    fit_inds: [list of ints] restrict fitting to certain points in the 
+    fit_inds: [list of ints] restrict fitting to certain points in the
         shape model
     mw: [float] weighting on the mahalanobis fitting penalty. Reasonable value
         is 0.1 to 1.0
@@ -98,7 +113,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     fit_scale: [bool] fit for scaling, default is False
     ftol: [float] relative error desired in sum of squared error
     sample: [int] number of points to sample from the target data
-    ldmk_targ: [mx3 array] additional target landmark points to use during
+    ldmk_targs: [mx3 array] additional target landmark points to use during
         fitting
     ldmk_evaluator: functional that evaluates corresponding landmark
         coordinates from reconstructed data points. Should take as input a nx3
@@ -108,6 +123,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
     recon2coords: A function for reconstructing point coordinates from shape
         model data. e.g. r2c13 and r2c31 in this module.
     verbose: [bool] extra info during fit
+    n_jobs: number of threads to use when calculating closes neighbours using cKDTree.query
     f_scale: f_scale parameter for least_squares trf solver. If None, uses the
         leastsq solver. Else should be something like 5.0 to regard points more
         than 5.0 mm distant was outliers.
@@ -146,7 +162,7 @@ def fitSSMTo3DPoints(data, ssm, fit_comps, fit_mode, fit_inds=None, mw=0.0,
         log.debug('fit_inds shape:', fit_inds.shape)
 
     if sample is not None:
-        data = _sampleData(data, sample)
+        data = _sample_data(data, sample)
 
     # -------------------------------------------------------------------------#
     # define reconstruction functions
