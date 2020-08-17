@@ -360,12 +360,6 @@ def fitDataTranslateEPDP(
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target
-
-    Note that the resulting rotations are applied about the centre of mass of the `data` point cloud.
-    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
-
-    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
-    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
@@ -409,6 +403,12 @@ def fitDataRigidDPEP(
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in target and closest neighbour
     in data
+
+    Note that the resulting rotations are applied about the centre of mass of the `data` point cloud.
+    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
+
+    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
+    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
@@ -453,6 +453,12 @@ def fitDataRigidScaleEPDP(
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target
+
+    Note that the resulting rotations and scaling are applied about the centre of mass of the `data` point cloud.
+    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
+
+    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
+    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
@@ -508,6 +514,12 @@ def fitDataRigidScaleDPEP(
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in target and closest neighbour
     in data
+
+    Note that the resulting rotations and scaling are applied about the centre of mass of the `data` point cloud.
+    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
+
+    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
+    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
