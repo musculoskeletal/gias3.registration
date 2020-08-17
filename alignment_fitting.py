@@ -310,7 +310,13 @@ def fitDataRigidEPDP(
                                         Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
-    in target
+    in target.
+
+    Note that the resulting rotations are applied about the centre of mass of the `data` point cloud.
+    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
+
+    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
+    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
@@ -354,6 +360,12 @@ def fitDataTranslateEPDP(
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target
+
+    Note that the resulting rotations are applied about the centre of mass of the `data` point cloud.
+    The centre of mass is calculated simply as the euclidean mean of all the points in `data`.
+
+    If you want to apply the resulting transformation `t` on another point cloud `p` that has a different centre of
+    mass, you must use `transform3D.transformRigid3DAboutP(p, t, c)` where c is the centre of mass of `data`.
     """
 
     if sample is not None:
