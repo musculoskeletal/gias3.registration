@@ -19,7 +19,7 @@ from scipy.linalg import lstsq
 from scipy.optimize import leastsq, fmin
 from scipy.spatial import cKDTree
 
-from gias2.common import transform3D
+from gias3.common import transform3D
 
 log = logging.getLogger(__name__)
 
@@ -48,8 +48,8 @@ def fitAffine(
         maxfev: int = 0,
         sample: Optional[int] = None,
         verbose: int = 0,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     if len(data) != len(target):
         raise ValueError('data and target points must have same number of points')
 
@@ -68,7 +68,7 @@ def fitAffine(
     if verbose:
         log.info('initial & final RMS: %s, %s', rms0, rms_opt)
 
-    if outputErrors:
+    if output_errors:
         return t, data_fitted, (rms0, rms_opt)
     else:
         return t, data_fitted
@@ -81,8 +81,8 @@ def fitTranslation(
         maxfev: int = 0,
         sample: Optional[int] = None,
         verbose: int = 0,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fits for tx,ty for transforms points in data to points
     in target. Points in data and target are assumed to correspond by
     order
@@ -113,7 +113,7 @@ def fitTranslation(
         log.info('final RMS: %s', rms_opt)
 
     data_fitted = data + x_opt
-    if outputErrors:
+    if output_errors:
         return x_opt, data_fitted, (rms0, rms_opt)
     else:
         return x_opt, data_fitted
@@ -130,8 +130,8 @@ def fitRigid(
         sample: int = None,
         verbose: bool = False,
         epsfcn: float = 0,
-        outputErrors: float = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                          Tuple[np.ndarray, np.ndarray]]:
+        output_errors: float = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                           Tuple[np.ndarray, np.ndarray]]:
     """ fits for tx,ty,tz,rx,ry,rz to transform points in data to points
     in target. Points in data and target are assumed to correspond by
     order
@@ -180,7 +180,7 @@ def fitRigid(
         log.info('final RMS: %s', rms_opt)
 
     data_fitted = transform3D.transformRigid3DAboutP(data, x_opt, rotcentre)
-    if outputErrors:
+    if output_errors:
         return x_opt, data_fitted, (rms0, rms_opt)
     else:
         return x_opt, data_fitted
@@ -194,8 +194,8 @@ def fitRigidFMin(
         maxfev: int = 0,
         sample: int = None,
         verbose: int = 0,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fits for tx,ty,tz,rx,ry,rz to transform points in data to points
     in target. Points in data and target are assumed to correspond by
     order
@@ -229,7 +229,7 @@ def fitRigidFMin(
         log.info('final RMS: %s', rms_opt)
 
     data_fitted = transform3D.transformRigid3DAboutCoM(data, x_opt)
-    if outputErrors:
+    if output_errors:
         return x_opt, data_fitted, (rms0, rms_opt)
     else:
         return x_opt, data_fitted
@@ -243,8 +243,8 @@ def fitRigidScale(
         maxfev: int = 0,
         sample: int = None,
         verbose: int = 0,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fits for tx,ty,tz,rx,ry,rz,s to transform points in data to points
     in target. Points in data and target are assumed to correspond by
     order
@@ -290,7 +290,7 @@ def fitRigidScale(
         log.info('final RMS: %s', rms_opt)
 
     data_fitted = transform3D.transformRigidScale3DAboutCoM(data, x_opt)
-    if outputErrors:
+    if output_errors:
         return x_opt, data_fitted, (rms0, rms_opt)
     else:
         return x_opt, data_fitted
@@ -306,8 +306,8 @@ def fitDataRigidEPDP(
         maxfev: int = 0,
         t0: np.ndarray = None,
         sample: int = None,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target.
@@ -342,7 +342,7 @@ def fitDataRigidEPDP(
     data_fitted = transform3D.transformRigid3DAboutCoM(data, t_opt)
     final_rmse = np.sqrt(obj(t_opt).mean())
 
-    if outputErrors:
+    if output_errors:
         return t_opt, data_fitted, (initial_rmse, final_rmse)
     else:
         return t_opt, data_fitted
@@ -355,8 +355,8 @@ def fitDataTranslateEPDP(
         maxfev: int = 0,
         t0: np.ndarray = None,
         sample: int = None,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target
@@ -385,7 +385,7 @@ def fitDataTranslateEPDP(
     data_fitted = transform3D.transformRigid3DAboutCoM(data, np.hstack((t_opt, [0.0, 0.0, 0.0])))
     final_rmse = np.sqrt(obj(t_opt).mean())
 
-    if outputErrors:
+    if output_errors:
         return t_opt, data_fitted, (initial_rmse, final_rmse)
     else:
         return t_opt, data_fitted
@@ -398,8 +398,8 @@ def fitDataRigidDPEP(
         maxfev: int = 0,
         t0: np.ndarray = None,
         sample: int = None,
-        outputErrors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                        Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                         Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in target and closest neighbour
     in data
@@ -434,7 +434,7 @@ def fitDataRigidDPEP(
     data_fitted = transform3D.transformRigid3DAboutCoM(data, t_opt)
     final_rmse = np.sqrt(obj(t_opt).mean())
 
-    if outputErrors:
+    if output_errors:
         return t_opt, data_fitted, (initial_rmse, final_rmse)
     else:
         return t_opt, data_fitted
@@ -447,9 +447,9 @@ def fitDataRigidScaleEPDP(
         maxfev: int = 0,
         t0: np.ndarray = None,
         sample: int = None,
-        outputErrors: int = 0,
-        scaleThreshold: Optional[float] = None) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                                         Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0,
+        scale_threshold: Optional[float] = None) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                                          Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in data and closest neighbour
     in target
@@ -474,12 +474,12 @@ def fitDataRigidScaleEPDP(
     t_tree = cKDTree(T)
     D = np.array(D)
 
-    if scaleThreshold is not None:
+    if scale_threshold is not None:
         def obj(t):
             dt = transform3D.transformRigidScale3DAboutCoM(D, t)
             d = t_tree.query(list(dt))[0]
             s = max(t[-1], 1.0 / t[-1])
-            if s > scaleThreshold:
+            if s > scale_threshold:
                 sw = 1000.0 * s
             else:
                 sw = 1.0
@@ -495,7 +495,7 @@ def fitDataRigidScaleEPDP(
     data_fitted = transform3D.transformRigidScale3DAboutCoM(data, t_opt)
     final_rmse = np.sqrt(obj(t_opt).mean())
 
-    if outputErrors:
+    if output_errors:
         return t_opt, data_fitted, (initial_rmse, final_rmse)
     else:
         return t_opt, data_fitted
@@ -508,9 +508,9 @@ def fitDataRigidScaleDPEP(
         maxfev: int = 0,
         t0: np.ndarray = None,
         sample: int = None,
-        outputErrors: int = 0,
-        scaleThreshold: Optional[float] = None) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
-                                                         Tuple[np.ndarray, np.ndarray]]:
+        output_errors: int = 0,
+        scale_threshold: Optional[float] = None) -> Union[Tuple[np.ndarray, np.ndarray, Tuple[float, float]],
+                                                          Tuple[np.ndarray, np.ndarray]]:
     """ fit list of points data to list of points target by minimising
     least squares distance between each point in target and closest neighbour
     in data
@@ -534,13 +534,13 @@ def fitDataRigidScaleDPEP(
 
     D = np.array(D)
 
-    if scaleThreshold is not None:
+    if scale_threshold is not None:
         def obj(t):
             DT = transform3D.transformRigidScale3DAboutCoM(D, t)
             DTTree = cKDTree(DT)
             d = DTTree.query(T)[0]
             s = t[6]
-            if s > scaleThreshold:
+            if s > scale_threshold:
                 sw = 1000.0 * s
             else:
                 sw = 1.0
@@ -557,7 +557,7 @@ def fitDataRigidScaleDPEP(
     data_fitted = transform3D.transformRigidScale3DAboutCoM(data, t_opt)
     final_rmse = np.sqrt(obj(t_opt).mean())
 
-    if outputErrors:
+    if output_errors:
         return t_opt, data_fitted, (initial_rmse, final_rmse)
     else:
         return t_opt, data_fitted

@@ -12,15 +12,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 import logging
+import sys
 from typing import List, Optional, Union, Callable, Tuple
 
 import numpy as np
-import sys
 from scipy.optimize import leastsq, least_squares
 from scipy.spatial import cKDTree
 
-from gias2.common import transform3D
-from gias2.learning.PCA import PrincipalComponents
+from gias3.common import transform3D
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +70,7 @@ def r2c31(x_recon: np.ndarray) -> np.ndarray:
 # =============================================================================#
 def fitSSMTo3DPoints(
         data: np.ndarray,
-        ssm: PrincipalComponents,
+        ssm: object,
         fit_comps: List[int],
         fit_mode: str,
         fit_inds: Optional[Union[list, np.ndarray]] = None,
@@ -97,7 +96,7 @@ def fitSSMTo3DPoints(
     arguments
     ---------
     data: nx3 array of target point coordinates.
-    ssm: a gias2.learning.PCA.PrincipalComponents object
+    ssm: a gias3.learning.PCA.PrincipalComponents object
     fit_comps: a list of PC modes to fit, e.g. [0,1,2] to fit the 1st 3 modes.
     fit_mode: {'st'|'ts'|'2way'|'corr'} source to target, target to source, 
         2 way, or corresponding fitting. Use st if target datacloud covers more

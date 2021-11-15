@@ -15,8 +15,8 @@ from typing import Tuple
 
 import numpy as np
 
-from gias2.common import math
-from gias2.common import transform3D
+from gias3.common import math
+from gias3.common import transform3D
 
 
 def norm(v: np.ndarray) -> np.ndarray:

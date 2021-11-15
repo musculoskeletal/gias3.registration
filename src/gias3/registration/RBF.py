@@ -12,6 +12,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ===============================================================================
 """
 import logging
+import pickle
+
 from typing import Callable, Tuple, Optional, Union
 
 import numpy as np
@@ -21,12 +23,7 @@ from scipy.optimize import leastsq
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 
-from gias2.registration import alignment_fitting as af
-
-if sys.version_info.major < 3:
-    import cPickle as pickle
-else:
-    import pickle
+from gias3.registration import alignment_fitting as af
 
 log = logging.getLogger(__name__)
 
@@ -176,15 +173,16 @@ def makeBasisWendlandsC32NonUniformWidth(s: float, scaling: float) -> Callable:
     return b
 
 
-RBFBases = {'gaussian': makeBasisGaussian,
-            'gaussianNonUniformWidth': makeBasisGaussianNonUniformWidth,
-            'normalisedgaussianNonUniformWidth': makeBasisNormalisedGaussianNonUniformWidth,
-            'TPS': makeBasisTPS,
-            'multiquadric': makeBasisMultiQuadric,
-            'biharmonic': makeBasisBiharmonic,
-            'WC31NonUniformWidth': makeBasisWendlandsC31NonUniformWidth,
-            'WC32NonUniformWidth': makeBasisWendlandsC32NonUniformWidth,
-            }
+RBFBases = {
+    'gaussian': makeBasisGaussian,
+    'gaussianNonUniformWidth': makeBasisGaussianNonUniformWidth,
+    'normalisedgaussianNonUniformWidth': makeBasisNormalisedGaussianNonUniformWidth,
+    'TPS': makeBasisTPS,
+    'multiquadric': makeBasisMultiQuadric,
+    'biharmonic': makeBasisBiharmonic,
+    'WC31NonUniformWidth': makeBasisWendlandsC31NonUniformWidth,
+    'WC32NonUniformWidth': makeBasisWendlandsC32NonUniformWidth,
+}
 
 
 # =============================================================================#
@@ -374,10 +372,11 @@ def fitComponentFieldKnotWidth(
         return rbf_func, fitRMSE, fit_info
 
 
-polynomials = {0: polyConst3D,
-               1: polyLinear3D,
-               3: polyCubic3D,
-               }
+polynomials = {
+    0: polyConst3D,
+    1: polyLinear3D,
+    3: polyCubic3D,
+}
 
 
 # =============================================================================#
@@ -400,8 +399,8 @@ class RBFComponentsField(object):
         self.basis = None
         self.M = None
         self.nComponents = n_components
-        self.basisType = None
-        self.basisArgs = {}
+        self.basis_type = None
+        self.basis_args = {}
         self.CWidth = None
         self.polyOrder = None
         self.polyCoeffs = None
@@ -413,8 +412,8 @@ class RBFComponentsField(object):
         d = {'CWidthNN': self.CWidthNN,
              'C': self.C,
              'U': self.U,
-             'basisType': self.basisType,
-             'basisArgs': self.basisArgs,
+             'basis_type': self.basis_type,
+             'basis_args': self.basis_args,
              'W': self.W,
              'nComponents': self.nComponents,
              'polyCoeffs': self.polyCoeffs,
@@ -433,15 +432,15 @@ class RBFComponentsField(object):
         self.W = d['W']
         self.C = d['C']
         self.U = d['U']
-        self.basisType = d['basisType']
-        self.basisArgs = d['basisArgs']
-        if self.basisArgs is not None:
-            if isinstance(self.basisArgs, list) and self.basisType == 'gaussian':
-                self.basisArgs = {'s': self.basisArgs[0]}
+        self.basis_type = d['basis_type']
+        self.basis_args = d['basis_args']
+        if self.basis_args is not None:
+            if isinstance(self.basis_args, list) and self.basis_type == 'gaussian':
+                self.basis_args = {'s': self.basis_args[0]}
 
-            self.setBasis(RBFBases[self.basisType](**self.basisArgs))
+            self.setBasis(RBFBases[self.basis_type](**self.basis_args))
         else:
-            self.setBasis(RBFBases[self.basisType]())
+            self.setBasis(RBFBases[self.basis_type]())
 
         self.setCentres(self.C)
 
@@ -463,9 +462,9 @@ class RBFComponentsField(object):
         else:
             self.CWidth = estimateNonUniformWidth(centres, k=self.CWidthNN)
 
-        if 'NonUniformWidth' in self.basisType:
-            self.basisArgs['s'] = self.CWidth
-            self.makeBasis(self.basisType, self.basisArgs)
+        if 'NonUniformWidth' in self.basis_type:
+            self.basis_args['s'] = self.CWidth
+            self.makeBasis(self.basis_type, self.basis_args)
 
         self.M = self.basis(M)
 
@@ -482,14 +481,14 @@ class RBFComponentsField(object):
     def setBasis(self, phi: Callable) -> None:
         self.basis = phi
 
-    def makeBasis(self, basisType: str, basisArgs: dict) -> None:
-        self.basisType = basisType
-        self.basisArgs = basisArgs
+    def makeBasis(self, basis_type: str, basis_args: dict) -> None:
+        self.basis_type = basis_type
+        self.basis_args = basis_args
 
-        if self.basisArgs is not None:
-            self.setBasis(RBFBases[self.basisType](**self.basisArgs))
+        if self.basis_args is not None:
+            self.setBasis(RBFBases[self.basis_type](**self.basis_args))
         else:
-            self.setBasis(RBFBases[self.basisType]())
+            self.setBasis(RBFBases[self.basis_type]())
 
     def calcWeights(self) -> None:
         # ~ print 'solving system...'
@@ -669,9 +668,9 @@ def rbfreg(
         knots: np.ndarray,
         source: np.ndarray,
         target: np.ndarray,
-        basistype: str,
-        basisargs: dict,
-        disttype: str,
+        basis_type: str,
+        basis_args: dict,
+        dist_type: str,
         verbose: bool = True) -> Tuple[np.ndarray, float, RBFComponentsField, np.ndarray]:
     """
     Perform a single iteration of RBF registration from source to target
@@ -684,20 +683,20 @@ def rbfreg(
     rcf.verbose = verbose
 
     # set radial basis function
-    rcf.makeBasis(basistype, basisargs)
+    rcf.makeBasis(basis_type, basis_args)
 
     # create a knot at every 10 data point
     rcf.setCentres(knots)
 
     # find correspondence
-    if disttype == 'st':
+    if dist_type == 'st':
         # find closest target point to each source point
         # log.debug('using ts')
         target_tree = cKDTree(target)
         closest_inds = target_tree.query(source)[1]
         X = source
         Y = target[closest_inds]
-    elif disttype == 'ts':
+    elif dist_type == 'ts':
         # find closest source point to each target point
         # log.debug('using ts')
         source_tree = cKDTree(source)
@@ -726,7 +725,7 @@ def _check_termination(
         it: int,
         cost1: float,
         cost0: float,
-        nknots: int,
+        n_knots: int,
         xtol: float,
         max_it: int,
         max_knots: int,
@@ -736,7 +735,7 @@ def _check_termination(
             log.debug('terminating because max iterations reached')
         return True
 
-    if nknots > max_knots:
+    if n_knots > max_knots:
         if verbose:
             log.debug('terminating because max knots reached')
         return True
@@ -753,15 +752,15 @@ def _check_termination(
 def rbfRegIterative(
         source: np.ndarray,
         target: np.ndarray,
-        distmode: str = 'ts',
+        dist_mode: str = 'ts',
         knots: Optional[np.ndarray] = None,
-        basisType: str = 'gaussianNonUniformWidth',
-        basisArgs: Optional[dict] = None,
+        basis_type: str = 'gaussianNonUniformWidth',
+        basis_args: Optional[dict] = None,
         xtol: float = 1e-3,
-        minKnotDist: float = 5.0,
-        maxIt: int = 50,
-        maxKnots: int = 500,
-        maxKnotsPerIt: int = 20,
+        min_knot_dist: float = 5.0,
+        max_it: int = 50,
+        max_knots: int = 500,
+        max_knots_per_it: int = 20,
         verbose: bool = True) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
@@ -771,19 +770,19 @@ def rbfRegIterative(
     ------
     source: list of source point coordinates.
     target: list of target point coordinates.
-    distmode: how source to target distance is calculated.
+    dist_mode: how source to target distance is calculated.
         'st': source to target - between each source point and closest target
               point.
         'ts': target to source - between each target point and closest source
               point.
         'alt': alternate between st and ts each iteration
     knots: list of knot coordinates.
-    basisType: Radial basis type.
-    basisArgs: dictionary of arguments fro the basis type.
+    basis_type: Radial basis type.
+    basis_args: dictionary of arguments fro the basis type.
     xtol: relative change in error for termination.
-    maxIt: max number of iterations.
-    minKnotDist: minimum distance between knots.
-    maxKnotsPerIt: max number of knots to add per iteration.
+    max_it: max number of iterations.
+    min_knot_dist: minimum distance between knots.
+    max_knots_per_it: max number of knots to add per iteration.
 
     returns
     -------
@@ -796,8 +795,8 @@ def rbfRegIterative(
         'nknots': number knots at each iteration.
     """
 
-    if basisArgs is None:
-        basisArgs = {'s': 1.0, 'scaling': 500.0}
+    if basis_args is None:
+        basis_args = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
         knots = _generate_bbox_points_grid(source, padding=10.0)
@@ -813,37 +812,37 @@ def rbfRegIterative(
         'ssdist': [],
         'nknots': [],
     }
-    distmodes = ['ts', 'st']
+    dist_modes = ['ts', 'st']
     while not terminate:
 
         # perform fit
-        if distmode == 'alt':
-            _distmode = distmodes[it % 2]
+        if dist_mode == 'alt':
+            _dist_mode = dist_modes[it % 2]
         else:
-            _distmode = distmode
+            _dist_mode = dist_mode
 
         source_new, rms, rcf, dist = rbfreg(
             knots,
             source_current,
             target,
-            basisType,
-            basisArgs,
-            _distmode,
+            basis_type,
+            basis_args,
+            _dist_mode,
             verbose=verbose
         )
         ssdist_new = (dist * dist).sum()
 
         # check if should terminate
-        if distmode == 'alt':
+        if dist_mode == 'alt':
             if not it % 2:
                 terminate = _check_termination(
                     it, ssdist_new, ssdist_current, knots.shape[0],
-                    xtol, maxIt, maxKnots, verbose=verbose
+                    xtol, max_it, max_knots, verbose=verbose
                 )
         else:
             terminate = _check_termination(
                 it, ssdist_new, ssdist_current, knots.shape[0],
-                xtol, maxIt, maxKnots, verbose=verbose
+                xtol, max_it, max_knots, verbose=verbose
             )
 
         # add knot
@@ -862,11 +861,11 @@ def rbfRegIterative(
             for maxInd in source_max_dist_inds:
                 knots_tree = cKDTree(knots)
                 closest_knot_dist = knots_tree.query(source_new[maxInd])[0]
-                if closest_knot_dist > minKnotDist:
+                if closest_knot_dist > min_knot_dist:
                     knots = np.vstack([knots, source_new[maxInd]])
                     n_knots_added += 1
 
-                if n_knots_added == maxKnotsPerIt:
+                if n_knots_added == max_knots_per_it:
                     break
 
             if n_knots_added == 0:
@@ -887,15 +886,15 @@ def rbfRegIterative(
 def rbfRegIterative2(
         source: np.ndarray,
         target: np.ndarray,
-        distmode: str = 'ts',
+        dist_mode: str = 'ts',
         knots: Optional[np.ndarray] = None,
-        basisType: str = 'gaussianNonUniformWidth',
-        basisArgs: Optional[dict] = None,
+        basis_type: str = 'gaussianNonUniformWidth',
+        basis_args: Optional[dict] = None,
         xtol: float = 1e-3,
-        minKnotDist: float = 5.0,
-        maxIt: int = 50,
-        maxKnots: int = 500,
-        maxKnotsPerIt: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
+        min_knot_dist: float = 5.0,
+        max_it: int = 50,
+        max_knots: int = 500,
+        max_knots_per_it: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
     New knots are placed on source points.
@@ -904,19 +903,19 @@ def rbfRegIterative2(
     ------
     source: list of source point coordinates.
     target: list of target point coordinates.
-    distmode: how source to target distance is calculated.
+    dist_mode: how source to target distance is calculated.
         'st': source to target - between each source point and closest target
               point.
         'ts': target to source - between each target point and closest source
               point.
         'alt': alternate between st and ts each iteration
     knots: list of knot coordinates.
-    basisType: Radial basis type.
-    basisArgs: dictionary of arguments fro the basis type.
+    basis_type: Radial basis type.
+    basis_args: dictionary of arguments fro the basis type.
     xtol: relative change in error for termination.
-    maxIt: max number of iterations.
-    minKnotDist: minimum distance between knots.
-    maxKnotsPerIt: max number of knots to add per iteration.
+    max_it: max number of iterations.
+    min_knot_dist: minimum distance between knots.
+    max_knots_per_it: max number of knots to add per iteration.
 
     returns
     -------
@@ -929,8 +928,8 @@ def rbfRegIterative2(
         'nknots': number knots at each iteration.
     """
 
-    if basisArgs is None:
-        basisArgs = {'s': 1.0, 'scaling': 500.0}
+    if basis_args is None:
+        basis_args = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
         knots = _generate_bbox_points_grid(source, padding=10.0)
@@ -946,36 +945,36 @@ def rbfRegIterative2(
         'ssdist': [],
         'nknots': [],
     }
-    distmodes = ['ts', 'st']
+    dist_modes = ['ts', 'st']
     while not terminate:
 
         # perform fit
-        if distmode == 'alt':
-            _distmode = distmodes[it % 2]
+        if dist_mode == 'alt':
+            _dist_mode = dist_modes[it % 2]
         else:
-            _distmode = distmode
+            _dist_mode = dist_mode
 
         source_new, rms, rcf, dist = rbfreg(
             knots,
             source_current,
             target,
-            basisType,
-            basisArgs,
-            _distmode,
+            basis_type,
+            basis_args,
+            _dist_mode,
         )
         ssdist_new = (dist * dist).sum()
 
         # check if should terminate
-        if distmode == 'alt':
+        if dist_mode == 'alt':
             if not it % 2:
                 terminate = _check_termination(
                     it, ssdist_new, ssdist_current, knots.shape[0],
-                    xtol, maxIt, maxKnots,
+                    xtol, max_it, max_knots,
                 )
         else:
             terminate = _check_termination(
                 it, ssdist_new, ssdist_current, knots.shape[0],
-                xtol, maxIt, maxKnots,
+                xtol, max_it, max_knots,
             )
 
         # add knot
@@ -993,11 +992,11 @@ def rbfRegIterative2(
             for maxInd in source_max_dist_inds:
                 knots_tree = cKDTree(knots)
                 closest_knot_dist = knots_tree.query(source[maxInd])[0]
-                if closest_knot_dist > minKnotDist:
+                if closest_knot_dist > min_knot_dist:
                     knots = np.vstack([knots, source[maxInd]])
                     n_knots_added += 1
 
-                if n_knots_added == maxKnotsPerIt:
+                if n_knots_added == max_knots_per_it:
                     break
 
             if n_knots_added == 0:
@@ -1017,15 +1016,15 @@ def rbfRegIterative2(
 def rbfRegIterative3(
         source: np.ndarray,
         target: np.ndarray,
-        distmode: str = 'ts',
+        dist_mode: str = 'ts',
         knots: Optional[list] = None,
-        basisType: str = 'gaussianNonUniformWidth',
-        basisArgs: Optional[dict] = None,
+        basis_type: str = 'gaussianNonUniformWidth',
+        basis_args: Optional[dict] = None,
         xtol: float = 1e-3,
-        minKnotDist: float = 5.0,
-        maxIt: int = 50,
-        maxKnots: int = 500,
-        maxKnotsPerIt: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
+        min_knot_dist: float = 5.0,
+        max_it: int = 50,
+        max_knots: int = 500,
+        max_knots_per_it: int = 20) -> Tuple[np.ndarray, float, RBFComponentsField, dict]:
     """Iterative RBF registration with greedy knots adding per iteration.
 
     Each iteration only contains it 0 knots plus those added in the last
@@ -1035,19 +1034,19 @@ def rbfRegIterative3(
     ------
     source: list of source point coordinates.
     target: list of target point coordinates.
-    distmode: how source to target distance is calculated.
+    dist_mode: how source to target distance is calculated.
         'st': source to target - between each source point and closest target
               point.
         'ts': target to source - between each target point and closest source
               point.
         'alt': alternate between st and ts each iteration
     knots: list of knot coordinates.
-    basisType: Radial basis type.
-    basisArgs: dictionary of arguments fro the basis type.
+    basis_type: Radial basis type.
+    basis_args: dictionary of arguments fro the basis type.
     xtol: relative change in error for termination.
-    maxIt: max number of iterations.
-    minKnotDist: minimum distance between knots.
-    maxKnotsPerIt: max number of knots to add per iteration.
+    max_it: max number of iterations.
+    min_knot_dist: minimum distance between knots.
+    max_knots_per_it: max number of knots to add per iteration.
 
     returns
     -------
@@ -1060,8 +1059,8 @@ def rbfRegIterative3(
         'nknots': number knots at each iteration.
     """
 
-    if basisArgs is None:
-        basisArgs = {'s': 1.0, 'scaling': 500.0}
+    if basis_args is None:
+        basis_args = {'s': 1.0, 'scaling': 500.0}
 
     if knots is None:
         knots0 = _generate_bbox_points_grid(source, padding=10.0)
@@ -1086,32 +1085,32 @@ def rbfRegIterative3(
     while not terminate:
 
         # perform fit
-        if distmode == 'alt':
-            _distmode = dist_modes[it % 2]
+        if dist_mode == 'alt':
+            _dist_mode = dist_modes[it % 2]
         else:
-            _distmode = distmode
+            _dist_mode = dist_mode
 
         source_new, rms, rcf, dist = rbfreg(
             knots,
             source_current,
             target,
-            basisType,
-            basisArgs,
-            _distmode,
+            basis_type,
+            basis_args,
+            _dist_mode,
         )
         ssdist_new = (dist * dist).sum()
 
         # check if should terminate
-        if distmode == 'alt':
+        if dist_mode == 'alt':
             if not it % 2:
                 terminate = _check_termination(
                     it, ssdist_new, ss_dist_current, knots.shape[0],
-                    xtol, maxIt, maxKnots,
+                    xtol, max_it, max_knots,
                 )
         else:
             terminate = _check_termination(
                 it, ssdist_new, ss_dist_current, knots.shape[0],
-                xtol, maxIt, maxKnots,
+                xtol, max_it, max_knots,
             )
 
         # add knot
@@ -1130,11 +1129,11 @@ def rbfRegIterative3(
             for maxInd in source_max_dist_inds:
                 knots_tree = cKDTree(knots)
                 closest_knot_dist = knots_tree.query(source[maxInd])[0]
-                if closest_knot_dist > minKnotDist:
+                if closest_knot_dist > min_knot_dist:
                     knots = np.vstack([knots, source[maxInd]])
                     n_knots_added += 1
 
-                if n_knots_added == maxKnotsPerIt:
+                if n_knots_added == max_knots_per_it:
                     break
 
             if n_knots_added == 0:
@@ -1177,24 +1176,24 @@ def rbfRegNPass(
 
         DEFAULT_PARAMS = [
             {
-                'basisType': 'gaussianNonUniformWidth',
-                'basisArgs': {'s':1.0, 'scaling':1000.0},
-                'distmode': 'alt',
+                'basis_type': 'gaussianNonUniformWidth',
+                'basis_args': {'s':1.0, 'scaling':1000.0},
+                'dist_mode': 'alt',
                 'xtol': 1e-1,
-                'maxIt': 20,
-                'maxKnots': 500,
-                'minKnotDist': 20.0,
-                'maxKnotsPerIt': 20,
+                'max_it': 20,
+                'max_knots': 500,
+                'min_knot_dist': 20.0,
+                'max_knots_per_it': 20,
             },
             {
-                'basisType': 'gaussianNonUniformWidth',
-                'basisArgs': {'s':1.0, 'scaling':10.0},
-                'distmode': 'alt',
+                'basis_type': 'gaussianNonUniformWidth',
+                'basis_args': {'s':1.0, 'scaling':10.0},
+                'dist_mode': 'alt',
                 'xtol': 1e-3,
-                'maxIt': 20,
-                'maxKnots': 1000,
-                'minKnotDist': 2.5,
-                'maxKnotsPerIt': 20,
+                'max_it': 20,
+                'max_knots': 1000,
+                'min_knot_dist': 2.5,
+                'max_knots_per_it': 20,
             }
         ]
     verbose : bool
@@ -1211,24 +1210,24 @@ def rbfRegNPass(
     if rbfargs is None:
         rbfargs = [
             {
-                'basisType': 'gaussianNonUniformWidth',
-                'basisArgs': {'s': 1.0, 'scaling': 1000.0},
-                'distmode': 'alt',
+                'basis_type': 'gaussianNonUniformWidth',
+                'basis_args': {'s': 1.0, 'scaling': 1000.0},
+                'dist_mode': 'alt',
                 'xtol': 1e-1,
-                'maxIt': 20,
-                'maxKnots': 500,
-                'minKnotDist': 20.0,
-                'maxKnotsPerIt': 20,
+                'max_it': 20,
+                'max_knots': 500,
+                'min_knot_dist': 20.0,
+                'max_knots_per_it': 20,
             },
             {
-                'basisType': 'gaussianNonUniformWidth',
-                'basisArgs': {'s': 1.0, 'scaling': 10.0},
-                'distmode': 'alt',
+                'basis_type': 'gaussianNonUniformWidth',
+                'basis_args': {'s': 1.0, 'scaling': 10.0},
+                'dist_mode': 'alt',
                 'xtol': 1e-3,
-                'maxIt': 20,
-                'maxKnots': 1000,
-                'minKnotDist': 2.5,
-                'maxKnotsPerIt': 20,
+                'max_it': 20,
+                'max_knots': 1000,
+                'min_knot_dist': 2.5,
+                'max_knots_per_it': 20,
             }
         ]
 
@@ -1244,7 +1243,7 @@ def rbfRegNPass(
         xtol=1e-6,
         sample=1000,
         t0=t0,
-        outputErrors=1,
+        output_errors=1,
     )
 
     # add isotropic scaling to rigid registration
@@ -1254,7 +1253,7 @@ def rbfRegNPass(
         xtol=1e-6,
         sample=1000,
         t0=np.hstack([reg1_t, 1.0]),
-        outputErrors=1,
+        output_errors=1,
     )
 
     # =============================================================#
