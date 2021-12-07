@@ -17,7 +17,4 @@ This file is part of GIAS. (https://bitbucket.org/jangle/gias)
     You should have received a copy of the GNU General Public License
     along with GIAS.  If not, see <http://www.gnu.org/licenses/>..
 """
-from gias3.registration.version import __version__
-from gias3.registration.RBF import rbfRegNPass
-from gias3.registration.alignment_fitting import *
-from gias3.registration.shapemodel import fitSSMTo3DPoints
+__version__ = "3.0.1"
