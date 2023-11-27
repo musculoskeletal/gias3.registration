@@ -84,7 +84,7 @@ def fitSSMTo3DPoints(
         ldmk_weights: Optional[np.ndarray] = None,
         recon2coords: Optional[Callable] = None,
         verbose: bool = False,
-        n_jobs: int = 1,
+        workers: int = 1,
         f_scale: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, float, float]]:
     """
     Fit a shape model to a set of non-correspondent points by optimising
@@ -122,7 +122,7 @@ def fitSSMTo3DPoints(
     recon2coords: A function for reconstructing point coordinates from shape
         model data. e.g. r2c13 and r2c31 in this module.
     verbose: [bool] extra info during fit
-    n_jobs: number of threads to use when calculating closes neighbours using cKDTree.query
+    workers: number of threads to use when calculating closes neighbours using cKDTree.query
     f_scale: f_scale parameter for least_squares trf solver. If None, uses the
         leastsq solver. Else should be something like 5.0 to regard points more
         than 5.0 mm distant was outliers.
@@ -166,26 +166,26 @@ def fitSSMTo3DPoints(
     # -------------------------------------------------------------------------#
     # define reconstruction functions
     # -------------------------------------------------------------------------#
-    def _recon_no_scale(X):
+    def _recon_no_scale(x):
         recon = ssm.reconstruct(
-            ssm.getWeightsBySD(fit_comps, X[6:]), fit_comps
+            ssm.getWeightsBySD(fit_comps, x[6:]), fit_comps
         )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigid3DAboutCoM(
-            recon2coords(recon), X[:6]
+            recon2coords(recon), x[:6]
         )
-        mahalanobis_dist = mahalanobis(X[6:])
+        mahalanobis_dist = mahalanobis(x[6:])
         return recon_pts, mahalanobis_dist
 
-    def _recon_scale(X):
+    def _recon_scale(x):
         recon = ssm.reconstruct(
-            ssm.getWeightsBySD(fit_comps, X[7:]), fit_comps
+            ssm.getWeightsBySD(fit_comps, x[7:]), fit_comps
         )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigidScale3DAboutCoM(
-            recon2coords(recon), X[:7]
+            recon2coords(recon), x[:7]
         )
-        mahalanobis_dist = mahalanobis(X[7:])
+        mahalanobis_dist = mahalanobis(x[7:])
         return recon_pts, mahalanobis_dist
 
     if fit_scale:
@@ -199,16 +199,16 @@ def fitSSMTo3DPoints(
     targ_tree = cKDTree(data)
 
     def _dist_sptp(recon_pts, m):
-        return targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
+        return targ_tree.query(recon_pts, eps=1e-9, workers=workers)[0] + mw * m
 
     def _dist_tpsp(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
+        return recon_tree.query(data, eps=1e-9, workers=workers)[0] + mw * m
 
     def _dist_2way(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        d_sptp = targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0]
-        d_tpsp = recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0]
+        d_sptp = targ_tree.query(recon_pts, eps=1e-9, workers=workers)[0]
+        d_tpsp = recon_tree.query(data, eps=1e-9, workers=workers)[0]
         dm = mw * m
         return np.hstack([d_sptp, d_tpsp]) + dm
 
@@ -230,9 +230,9 @@ def fitSSMTo3DPoints(
     # -------------------------------------------------------------------------#
     # define objective functions
     # -------------------------------------------------------------------------#
-    def _obj_no_ldmks(X):
+    def _obj_no_ldmks(x):
         # reconstruct data points
-        recon_data, mdist = _recon(X)
+        recon_data, mdist = _recon(x)
 
         # select the fitting points
         if fit_inds is not None:
@@ -247,9 +247,9 @@ def fitSSMTo3DPoints(
 
         return err
 
-    def _obj_ldmks(X):
+    def _obj_ldmks(x):
         # reconstruct data points
-        recon_data, mdist = _recon(X)
+        recon_data, mdist = _recon(x)
         recon_ldmks = ldmk_evaluator(recon_data.T.ravel())
 
         # calc error
@@ -260,7 +260,7 @@ def fitSSMTo3DPoints(
 
         if verbose:
             sys.stdout.write(
-                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)' % \
+                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)' %
                 (np.sqrt(err.mean()), np.sqrt(err_data.mean()), np.sqrt(err_ldmks.mean()))
             )
             sys.stdout.flush()
@@ -279,7 +279,7 @@ def fitSSMTo3DPoints(
 
     if verbose:
         recon_data_init, mdist_init = _recon(x0)
-        err_init = _obj(x0)
+        # err_init = _obj(x0)
         dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0) ** 2.0).mean())
         log.debug('\ninitial rms distance: {}'.format(dist_init_rms))
 
