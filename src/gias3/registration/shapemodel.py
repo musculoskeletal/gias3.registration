@@ -166,26 +166,26 @@ def fitSSMTo3DPoints(
     # -------------------------------------------------------------------------#
     # define reconstruction functions
     # -------------------------------------------------------------------------#
-    def _recon_no_scale(X):
+    def _recon_no_scale(x):
         recon = ssm.reconstruct(
-            ssm.getWeightsBySD(fit_comps, X[6:]), fit_comps
+            ssm.getWeightsBySD(fit_comps, x[6:]), fit_comps
         )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigid3DAboutCoM(
-            recon2coords(recon), X[:6]
+            recon2coords(recon), x[:6]
         )
-        mahalanobis_dist = mahalanobis(X[6:])
+        mahalanobis_dist = mahalanobis(x[6:])
         return recon_pts, mahalanobis_dist
 
-    def _recon_scale(X):
+    def _recon_scale(x):
         recon = ssm.reconstruct(
-            ssm.getWeightsBySD(fit_comps, X[7:]), fit_comps
+            ssm.getWeightsBySD(fit_comps, x[7:]), fit_comps
         )
         # reconstruct rigid transform
         recon_pts = transform3D.transformRigidScale3DAboutCoM(
-            recon2coords(recon), X[:7]
+            recon2coords(recon), x[:7]
         )
-        mahalanobis_dist = mahalanobis(X[7:])
+        mahalanobis_dist = mahalanobis(x[7:])
         return recon_pts, mahalanobis_dist
 
     if fit_scale:
@@ -230,9 +230,9 @@ def fitSSMTo3DPoints(
     # -------------------------------------------------------------------------#
     # define objective functions
     # -------------------------------------------------------------------------#
-    def _obj_no_ldmks(X):
+    def _obj_no_ldmks(x):
         # reconstruct data points
-        recon_data, mdist = _recon(X)
+        recon_data, mdist = _recon(x)
 
         # select the fitting points
         if fit_inds is not None:
@@ -247,9 +247,9 @@ def fitSSMTo3DPoints(
 
         return err
 
-    def _obj_ldmks(X):
+    def _obj_ldmks(x):
         # reconstruct data points
-        recon_data, mdist = _recon(X)
+        recon_data, mdist = _recon(x)
         recon_ldmks = ldmk_evaluator(recon_data.T.ravel())
 
         # calc error
@@ -260,7 +260,7 @@ def fitSSMTo3DPoints(
 
         if verbose:
             sys.stdout.write(
-                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)' % \
+                '\rPC fit rmse: %6.3f (data: %6.3f) (landmarks: %6.3f)' %
                 (np.sqrt(err.mean()), np.sqrt(err_data.mean()), np.sqrt(err_ldmks.mean()))
             )
             sys.stdout.flush()
@@ -279,7 +279,7 @@ def fitSSMTo3DPoints(
 
     if verbose:
         recon_data_init, mdist_init = _recon(x0)
-        err_init = _obj(x0)
+        # err_init = _obj(x0)
         dist_init_rms = np.sqrt((_dist(recon_data_init, 0.0) ** 2.0).mean())
         log.debug('\ninitial rms distance: {}'.format(dist_init_rms))
 
