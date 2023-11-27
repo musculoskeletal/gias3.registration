@@ -84,7 +84,7 @@ def fitSSMTo3DPoints(
         ldmk_weights: Optional[np.ndarray] = None,
         recon2coords: Optional[Callable] = None,
         verbose: bool = False,
-        n_jobs: int = 1,
+        workers: int = 1,
         f_scale: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, float, float]]:
     """
     Fit a shape model to a set of non-correspondent points by optimising
@@ -122,7 +122,7 @@ def fitSSMTo3DPoints(
     recon2coords: A function for reconstructing point coordinates from shape
         model data. e.g. r2c13 and r2c31 in this module.
     verbose: [bool] extra info during fit
-    n_jobs: number of threads to use when calculating closes neighbours using cKDTree.query
+    workers: number of threads to use when calculating closes neighbours using cKDTree.query
     f_scale: f_scale parameter for least_squares trf solver. If None, uses the
         leastsq solver. Else should be something like 5.0 to regard points more
         than 5.0 mm distant was outliers.
@@ -199,16 +199,16 @@ def fitSSMTo3DPoints(
     targ_tree = cKDTree(data)
 
     def _dist_sptp(recon_pts, m):
-        return targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
+        return targ_tree.query(recon_pts, eps=1e-9, workers=workers)[0] + mw * m
 
     def _dist_tpsp(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        return recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0] + mw * m
+        return recon_tree.query(data, eps=1e-9, workers=workers)[0] + mw * m
 
     def _dist_2way(recon_pts, m):
         recon_tree = cKDTree(recon_pts)
-        d_sptp = targ_tree.query(recon_pts, eps=1e-9, n_jobs=n_jobs)[0]
-        d_tpsp = recon_tree.query(data, eps=1e-9, n_jobs=n_jobs)[0]
+        d_sptp = targ_tree.query(recon_pts, eps=1e-9, workers=workers)[0]
+        d_tpsp = recon_tree.query(data, eps=1e-9, workers=workers)[0]
         dm = mw * m
         return np.hstack([d_sptp, d_tpsp]) + dm
 
